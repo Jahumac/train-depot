@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Train Depot</title>
+  <link rel="stylesheet" href="/css/styles.css?v=5">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚂</text></svg>">
+  <script>
+    // Apply saved theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('trainCatalogTheme');
+      if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo" onclick="app.showLanding()">
+        <span class="logo-icon">🚂</span>
+        <span>Train Depot</span>
+      </div>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#" onclick="app.showLanding(); return false;" id="nav-home" class="active">Home</a></li>
+        <li><a href="#" onclick="app.showCatalog(); return false;" id="nav-catalog">Catalog</a></li>
+        <li><a href="#" onclick="app.showBackup(); return false;" id="nav-backup">Settings</a></li>
+      </ul>
+      <div class="header-right">
+        <div class="nav-search">
+          <input type="text" id="globalSearch" placeholder="Search collection..." onkeyup="app.handleSearch(event)">
+        </div>
+        <button class="theme-toggle" onclick="app.toggleTheme()" title="Toggle dark mode">
+          <span class="theme-icon" id="themeIcon">🌙</span>
+        </button>
+      </div>
+      <button class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</button>
+    </div>
+  </header>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar" id="statsBar" style="display:none;">
+    <div class="stats-inner" id="statsContent"></div>
+  </div>
+
+  <!-- Main Content Area -->
+  <main id="mainContent">
+    <!-- Content is dynamically rendered by JavaScript -->
+  </main>
+
+  <!-- Modal for Add/Edit Item -->
+  <div class="modal-overlay" id="itemModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle">Add New Item</h2>
+        <button class="modal-close" onclick="app.closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="itemForm" onsubmit="app.saveItem(event)">
+          <div class="form-group">
+            <label class="form-label">Name <span class="required">*</span></label>
+            <input type="text" class="form-input" id="formName" required placeholder="Start typing a model name..." autocomplete="off"
+                   oninput="app.suggestModelName()" onblur="setTimeout(()=>app.hideModelSuggestions(),200)">
+            <ul class="autosuggest-list" id="suggest-modelName" style="display:none"></ul>
+            <div id="refImageNotice" style="display:none; margin-top:8px; padding:8px 12px; background:var(--gold-glow); border-radius:var(--radius-sm); font-size:0.85rem; color:var(--color-text);">
+              <span style="margin-right:4px;">✨</span> <span id="refImageNoticeText"></span>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Category <span class="required">*</span></label>
+              <select class="form-select" id="formCategory" required onchange="app.updateSubcategories()">
+                <option value="">Select category...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Subcategory <span class="required">*</span></label>
+              <select class="form-select" id="formSubcategory" required>
+                <option value="">Select subcategory...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Manufacturer</label>
+              <input type="text" class="form-input" id="formManufacturer" placeholder="Start typing..." autocomplete="off" oninput="app.suggest.show('formManufacturer', 'manufacturers')" onblur="setTimeout(()=>app.suggest.hide('formManufacturer'),200)">
+              <ul class="autosuggest-list" id="suggest-formManufacturer" style="display:none"></ul>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Livery</label>
+              <input type="text" class="form-input" id="formLivery" placeholder="Start typing..." autocomplete="off" oninput="app.suggest.show('formLivery', 'liveries')" onblur="setTimeout(()=>app.suggest.hide('formLivery'),200)">
+              <ul class="autosuggest-list" id="suggest-formLivery" style="display:none"></ul>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Purchase Price (£)</label>
+              <input type="number" class="form-input" id="formPrice" step="0.01" min="0" placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Place of Purchase</label>
+              <input type="text" class="form-input" id="formPlace" placeholder="Start typing..." autocomplete="off" oninput="app.suggest.show('formPlace', 'retailers')" onblur="setTimeout(()=>app.suggest.hide('formPlace'),200)">
+              <ul class="autosuggest-list" id="suggest-formPlace" style="display:none"></ul>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Last Service Date</label>
+              <input type="date" class="form-input" id="formServiceDate">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Goes Well With</label>
+              <input type="text" class="form-input" id="formGoesWellWith" placeholder="e.g., Teak coaches, LNER parcels van" autocomplete="off">
+              <div id="goesWellSuggestions" style="display:none;"></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Historical Background</label>
+            <textarea class="form-textarea" id="formHistory" rows="3" placeholder="Historical information about the prototype..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Photographs</label>
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()"
+                 ondragover="event.preventDefault(); this.classList.add('dragover')"
+                 ondragleave="this.classList.remove('dragover')"
+                 ondrop="app.handleDrop(event)">
+              <span class="upload-icon">📷</span>
+              <div class="upload-text">Click or drag images here</div>
+              <div class="upload-hint">JPG, PNG, GIF, WebP (max 10MB each)</div>
+            </div>
+            <input type="file" id="fileInput" multiple accept="image/*" style="display:none" onchange="app.handleFileSelect(event)">
+            <div class="upload-previews" id="uploadPreviews"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" type="button" onclick="app.closeModal()">Cancel</button>
+        <button class="btn btn-primary" type="button" onclick="app.saveItem(event)">💾 Save Item</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    Train Depot &copy; 2026 &middot; Built with care for collectors
+  </footer>
+
+  <script src="/js/reference-db.js?v=4"></script>
+  <script src="/js/app.js?v=5"></script>
+</body>
+</html>

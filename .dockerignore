@@ -1,0 +1,9 @@
+.git
+.gitignore
+README.md
+LICENSE
+node_modules
+data/catalog.json
+static/images/uploads/*
+!static/images/uploads/.gitkeep
+*.md

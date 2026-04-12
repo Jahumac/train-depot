@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>TrainDepot</Name>
+  <Repository>jahumac/train-depot:latest</Repository>
+  <Registry>https://hub.docker.com/r/jahumac/train-depot</Registry>
+  <Branch>
+    <Tag>latest</Tag>
+    <TagDescription>Latest stable release</TagDescription>
+  </Branch>
+  <Branch>
+    <Tag>v1.0.0</Tag>
+    <TagDescription>Initial release v1.0.0</TagDescription>
+  </Branch>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/jahumac/train-depot/issues</Support>
+  <Project>https://github.com/jahumac/train-depot</Project>
+  <Overview>
+    Train Depot — a self-hosted digital catalog for managing your model train collection.
+
+    Features include hierarchical categories (Steam, Diesel, Multiple Units, Rolling Stock by era), image upload with drag-and-drop, smart auto-fill from a built-in reference database, fuzzy auto-suggest, dark mode, configurable app name, search, and backup/export.
+
+    Zero external dependencies — runs on Node.js built-in modules only.
+
+    Your data and uploaded images persist across container restarts via the mapped volumes.
+  </Overview>
+  <Category>MediaApp:Other</Category>
+  <WebUI>http://[IP]:[PORT:8005]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/jahumac/train-depot/main/unraid/oo-gauge-catalog.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/jahumac/train-depot/main/unraid/icon.png</Icon>
+  <ExtraParams/>
+  <Description>
+    Train Depot — a self-hosted model train collection manager with image support, smart auto-fill, configurable settings, dark mode, and a green-and-gold heritage theme. No external dependencies required.
+  </Description>
+  <Config
+    Name="WebUI Port"
+    Target="8005"
+    Default="8005"
+    Mode="tcp"
+    Description="Port for the web interface"
+    Type="Port"
+    Display="always"
+    Required="true"
+    Mask="false">8005</Config>
+  <Config
+    Name="Catalog Data"
+    Target="/app/data"
+    Default="/mnt/user/appdata/train-depot/data"
+    Mode="rw"
+    Description="Path to store the catalog database (catalog.json)"
+    Type="Path"
+    Display="always"
+    Required="true"
+    Mask="false">/mnt/user/appdata/train-depot/data</Config>
+  <Config
+    Name="Uploaded Images"
+    Target="/app/data/uploads"
+    Default="/mnt/user/appdata/train-depot/uploads"
+    Mode="rw"
+    Description="Path to store uploaded item photos"
+    Type="Path"
+    Display="always"
+    Required="true"
+    Mask="false">/mnt/user/appdata/train-depot/uploads</Config>
+</Container>

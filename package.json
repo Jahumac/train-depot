@@ -1,0 +1,23 @@
+{
+  "name": "train-depot",
+  "version": "1.0.0",
+  "description": "A self-hosted model train collection catalog with image management, smart auto-fill, configurable settings, and a green-and-gold themed UI with dark mode.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "model-trains",
+    "catalog",
+    "collection",
+    "railway",
+    "train-depot"
+  ],
+  "author": "Janusz",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Database (user data - not tracked)
+data/catalog.json
+
+# Uploaded images (user content)
+static/images/uploads/*
+!static/images/uploads/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
