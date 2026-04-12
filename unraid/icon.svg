@@ -1,16 +1,155 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0f2b1f"/>
-      <stop offset="50%" style="stop-color:#1b4332"/>
-      <stop offset="100%" style="stop-color:#2d6a4f"/>
+    <linearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2d6a4f"/>
+      <stop offset="100%" stop-color="#1b4332"/>
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f2b1f"/>
+      <stop offset="100%" stop-color="#1b4332"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#dbb840"/>
     </linearGradient>
   </defs>
-  <rect width="256" height="256" rx="48" fill="url(#bg)"/>
-  <text x="128" y="110" text-anchor="middle" font-size="80" fill="#c9a227" font-family="Georgia, serif" font-weight="bold">OO</text>
-  <text x="128" y="175" text-anchor="middle" font-size="36" fill="#dbb840" font-family="Georgia, serif" font-weight="bold">GAUGE</text>
-  <line x1="48" y1="200" x2="208" y2="200" stroke="#c9a227" stroke-width="3" stroke-linecap="round"/>
-  <circle cx="80" cy="218" r="10" fill="none" stroke="#c9a227" stroke-width="3"/>
-  <circle cx="128" cy="218" r="10" fill="none" stroke="#c9a227" stroke-width="3"/>
-  <circle cx="176" cy="218" r="10" fill="none" stroke="#c9a227" stroke-width="3"/>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="72" fill="url(#bgGrad)"/>
+  <rect x="10" y="10" width="492" height="492" rx="64" fill="none" stroke="#c9a227" stroke-width="2" opacity="0.2"/>
+
+  <!-- Track bed -->
+  <rect x="70" y="358" width="372" height="5" rx="2.5" fill="#5a4a32"/>
+  <rect x="66" y="355" width="380" height="2.5" rx="1" fill="#888"/>
+  <rect x="66" y="363" width="380" height="2.5" rx="1" fill="#888"/>
+  <!-- Sleepers -->
+  <g fill="#4a3a22" opacity="0.65">
+    <rect x="76" y="353" width="11" height="15" rx="1"/>
+    <rect x="102" y="353" width="11" height="15" rx="1"/>
+    <rect x="128" y="353" width="11" height="15" rx="1"/>
+    <rect x="154" y="353" width="11" height="15" rx="1"/>
+    <rect x="180" y="353" width="11" height="15" rx="1"/>
+    <rect x="206" y="353" width="11" height="15" rx="1"/>
+    <rect x="232" y="353" width="11" height="15" rx="1"/>
+    <rect x="258" y="353" width="11" height="15" rx="1"/>
+    <rect x="284" y="353" width="11" height="15" rx="1"/>
+    <rect x="310" y="353" width="11" height="15" rx="1"/>
+    <rect x="336" y="353" width="11" height="15" rx="1"/>
+    <rect x="362" y="353" width="11" height="15" rx="1"/>
+    <rect x="388" y="353" width="11" height="15" rx="1"/>
+    <rect x="414" y="353" width="11" height="15" rx="1"/>
+  </g>
+
+  <!-- Steam wisps -->
+  <g opacity="0.10" fill="white">
+    <ellipse cx="170" cy="108" rx="28" ry="14">
+      <animate attributeName="cx" values="170;140;170" dur="5s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="140" cy="95" rx="18" ry="10">
+      <animate attributeName="cx" values="140;108;140" dur="6.5s" repeatCount="indefinite"/>
+    </ellipse>
+  </g>
+
+  <!-- === MALLARD A4 STREAMLINED BODY === -->
+
+  <!-- Streamlined nose wedge -->
+  <path d="M 112,330 L 112,265 Q 114,228 136,195 L 172,160 Q 184,150 198,150 L 198,330 Z"
+        fill="url(#bodyGrad)" stroke="#0f2b1f" stroke-width="1.5"/>
+
+  <!-- Main boiler casing -->
+  <rect x="198" y="150" width="120" height="35" fill="url(#bodyGrad)"/>
+
+  <!-- Body below boiler -->
+  <rect x="198" y="185" width="120" height="145" fill="url(#bodyGrad)" stroke="#0f2b1f" stroke-width="1"/>
+
+  <!-- Cab -->
+  <rect x="318" y="146" width="52" height="184" rx="3" fill="#1b4332" stroke="#0f2b1f" stroke-width="1.5"/>
+  <rect x="316" y="140" width="56" height="12" rx="4" fill="#0f2b1f"/>
+
+  <!-- Gold speed stripe — the A4 signature -->
+  <rect x="115" y="274" width="255" height="11" fill="url(#goldGrad)"/>
+
+  <!-- Streamlined valance -->
+  <rect x="112" y="285" width="258" height="45" rx="2" fill="#0f2b1f"/>
+
+  <!-- Chimney — recessed A4 style -->
+  <rect x="190" y="134" width="16" height="18" rx="4" fill="#0f2b1f"/>
+  <rect x="192" y="130" width="12" height="7" rx="3" fill="#1b4332"/>
+
+  <!-- Dome — faired into casing -->
+  <ellipse cx="248" cy="150" rx="13" ry="5.5" fill="#2d6a4f"/>
+  <ellipse cx="248" cy="150" rx="8" ry="3" fill="#c9a227" opacity="0.5"/>
+
+  <!-- Cab windows -->
+  <rect x="326" y="160" width="14" height="24" rx="2.5" fill="#87CEEB" opacity="0.45"/>
+  <rect x="348" y="160" width="14" height="24" rx="2.5" fill="#87CEEB" opacity="0.45"/>
+
+  <!-- Headlamp -->
+  <circle cx="119" cy="253" r="7" fill="#FFD700" opacity="0.9"/>
+  <circle cx="119" cy="253" r="4" fill="#FFF8DC"/>
+
+  <!-- Number plate -->
+  <rect x="128" y="234" width="40" height="12" rx="2" fill="#0f2b1f" stroke="#c9a227" stroke-width="0.7"/>
+  <text x="148" y="244" text-anchor="middle" font-family="Georgia, serif" font-size="8.5" font-weight="bold" fill="#c9a227">4468</text>
+
+  <!-- Nameplate -->
+  <rect x="208" y="257" width="64" height="12" rx="2" fill="#0f2b1f" stroke="#c9a227" stroke-width="0.7"/>
+  <text x="240" y="267" text-anchor="middle" font-family="Georgia, serif" font-size="8" font-weight="bold" fill="#c9a227">MALLARD</text>
+
+  <!-- Nose contour highlight -->
+  <path d="M 115,265 Q 117,240 128,220 L 144,200" fill="none" stroke="#c9a227" stroke-width="1.2" opacity="0.25"/>
+
+  <!-- === TENDER === -->
+  <rect x="374" y="188" width="64" height="142" rx="3" fill="#1b4332" stroke="#0f2b1f" stroke-width="1.5"/>
+  <rect x="374" y="180" width="64" height="13" rx="3" fill="#0f2b1f"/>
+  <rect x="379" y="196" width="54" height="42" rx="2" fill="#0a1510"/>
+  <rect x="374" y="274" width="64" height="11" fill="url(#goldGrad)"/>
+  <rect x="374" y="285" width="64" height="45" rx="2" fill="#0f2b1f"/>
+
+  <!-- === WHEELS === -->
+
+  <!-- Driving wheels -->
+  <g>
+    <circle cx="168" cy="342" r="20" fill="#333" stroke="#555" stroke-width="2.5"/>
+    <circle cx="168" cy="342" r="14" fill="none" stroke="#444" stroke-width="1.4"/>
+    <circle cx="168" cy="342" r="5" fill="#c9a227"/>
+  </g>
+  <g>
+    <circle cx="222" cy="342" r="20" fill="#333" stroke="#555" stroke-width="2.5"/>
+    <circle cx="222" cy="342" r="14" fill="none" stroke="#444" stroke-width="1.4"/>
+    <circle cx="222" cy="342" r="5" fill="#c9a227"/>
+  </g>
+  <g>
+    <circle cx="276" cy="342" r="20" fill="#333" stroke="#555" stroke-width="2.5"/>
+    <circle cx="276" cy="342" r="14" fill="none" stroke="#444" stroke-width="1.4"/>
+    <circle cx="276" cy="342" r="5" fill="#c9a227"/>
+  </g>
+
+  <!-- Bogie wheel -->
+  <circle cx="124" cy="345" r="11" fill="#333" stroke="#555" stroke-width="2"/>
+  <circle cx="124" cy="345" r="3" fill="#c9a227"/>
+
+  <!-- Trailing wheel -->
+  <circle cx="340" cy="345" r="11" fill="#333" stroke="#555" stroke-width="2"/>
+  <circle cx="340" cy="345" r="3" fill="#c9a227"/>
+
+  <!-- Tender wheels -->
+  <circle cx="396" cy="345" r="11" fill="#333" stroke="#555" stroke-width="2"/>
+  <circle cx="396" cy="345" r="3" fill="#c9a227"/>
+  <circle cx="426" cy="345" r="11" fill="#333" stroke="#555" stroke-width="2"/>
+  <circle cx="426" cy="345" r="3" fill="#c9a227"/>
+
+  <!-- Connecting rod -->
+  <line x1="168" y1="342" x2="276" y2="342" stroke="#999" stroke-width="2.8" stroke-linecap="round"/>
+  <line x1="168" y1="332" x2="276" y2="332" stroke="#777" stroke-width="1.6" stroke-linecap="round"/>
+
+  <!-- Buffer beam -->
+  <rect x="105" y="316" width="9" height="36" rx="2" fill="#8B0000"/>
+  <circle cx="109" cy="322" r="4" fill="#666"/>
+  <circle cx="109" cy="344" r="4" fill="#666"/>
+
+  <!-- === TEXT === -->
+  <text x="256" y="420" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="bold" fill="#c9a227" letter-spacing="2">TRAIN DEPOT</text>
+  <line x1="130" y1="432" x2="382" y2="432" stroke="#c9a227" stroke-width="0.8" opacity="0.25"/>
+  <text x="256" y="454" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="12" fill="#8a8a80" letter-spacing="2">MODEL TRAIN COLLECTION</text>
 </svg>
