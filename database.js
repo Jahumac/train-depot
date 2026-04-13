@@ -67,7 +67,7 @@ function ensureDbExists() {
       metadata: {
         created: new Date().toISOString(),
         lastModified: new Date().toISOString(),
-        version: '1.1.0'
+        version: '1.2.0'
       }
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(defaultDb, null, 2));
@@ -179,6 +179,14 @@ function createItem(itemData) {
     subcategoryId: itemData.subcategoryId || '',
     images: itemData.images || [],
     wishlist: itemData.wishlist || false,
+    runningNumber: itemData.runningNumber || '',
+    productCode: itemData.productCode || '',
+    condition: itemData.condition || '',
+    dccStatus: itemData.dccStatus || '',
+    purchaseDate: itemData.purchaseDate || '',
+    storageLocation: itemData.storageLocation || '',
+    serviceLog: itemData.serviceLog || [],
+    tags: itemData.tags || [],
     createdAt: now,
     updatedAt: now
   };
@@ -195,7 +203,9 @@ function updateItem(id, updates) {
 
   const allowed = ['name', 'manufacturer', 'purchasePrice', 'currentValue', 'placeOfPurchase',
     'livery', 'historicalBackground', 'goesWellWith', 'lastServiceDate',
-    'categoryId', 'subcategoryId', 'images', 'wishlist'];
+    'categoryId', 'subcategoryId', 'images', 'wishlist',
+    'runningNumber', 'productCode', 'condition', 'dccStatus', 'purchaseDate',
+    'storageLocation', 'serviceLog', 'tags'];
 
   for (const key of allowed) {
     if (updates[key] !== undefined) {
@@ -203,6 +213,8 @@ function updateItem(id, updates) {
         db.items[idx][key] = parseFloat(updates[key]) || 0;
       } else if (key === 'wishlist') {
         db.items[idx][key] = !!updates[key];
+      } else if (key === 'serviceLog' || key === 'tags') {
+        db.items[idx][key] = Array.isArray(updates[key]) ? updates[key] : [];
       } else {
         db.items[idx][key] = updates[key];
       }
@@ -230,7 +242,10 @@ function searchItems(query) {
     item.manufacturer.toLowerCase().includes(q) ||
     item.livery.toLowerCase().includes(q) ||
     item.historicalBackground.toLowerCase().includes(q) ||
-    item.goesWellWith.toLowerCase().includes(q)
+    item.goesWellWith.toLowerCase().includes(q) ||
+    item.runningNumber.toLowerCase().includes(q) ||
+    item.productCode.toLowerCase().includes(q) ||
+    (item.tags && item.tags.some(tag => tag.toLowerCase().includes(q)))
   );
 }
 
@@ -326,6 +341,27 @@ function deleteSubcategory(categoryId, subcategoryId) {
   const deleted = cat.subcategories.splice(idx, 1)[0];
   writeDb(db);
   return deleted;
+}
+
+function getAllTags() {
+  const db = readDb();
+  const tagCounts = {};
+  for (const item of db.items) {
+    if (item.tags && Array.isArray(item.tags)) {
+      for (const tag of item.tags) {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      }
+    }
+  }
+  return Object.entries(tagCounts).map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+function getItemsByTag(tag) {
+  const db = readDb();
+  return db.items.filter(item =>
+    item.tags && Array.isArray(item.tags) && item.tags.includes(tag)
+  );
 }
 
 // --- Statistics ---
@@ -498,6 +534,8 @@ module.exports = {
   searchItems,
   getItemsByCategory,
   getItemsBySubcategory,
+  getAllTags,
+  getItemsByTag,
   getCategories,
   addCategory,
   updateCategory,

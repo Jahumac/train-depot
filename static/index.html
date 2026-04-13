@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Train Depot</title>
-  <link rel="stylesheet" href="/css/styles.css?v=6">
+  <link rel="stylesheet" href="/css/styles.css?v=7">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚂</text></svg>">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1b4332">
@@ -30,6 +30,7 @@
       <ul class="nav-links" id="navLinks">
         <li><a href="#" onclick="app.showLanding(); return false;" id="nav-home" class="active">Home</a></li>
         <li><a href="#" onclick="app.showCatalog(); return false;" id="nav-catalog">Catalog</a></li>
+        <li><a href="#" onclick="app.showDashboard(); return false;" id="nav-dashboard">Dashboard</a></li>
         <li><a href="#" onclick="app.showBackup(); return false;" id="nav-backup">Settings</a></li>
       </ul>
       <div class="header-right">
@@ -93,6 +94,43 @@
 
           <div class="form-row">
             <div class="form-group">
+              <label class="form-label">Running Number</label>
+              <input type="text" class="form-input" id="formRunningNumber" placeholder="e.g., 4472 — every engine needs a number!">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Product Code</label>
+              <input type="text" class="form-input" id="formProductCode" placeholder="e.g., R3834 or 32-360" oninput="app.autoDetectManufacturer()">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Condition</label>
+              <select class="form-select" id="formCondition">
+                <option value="">Select condition...</option>
+                <option value="mint-boxed">Mint - Boxed</option>
+                <option value="mint">Mint</option>
+                <option value="excellent-boxed">Excellent - Boxed</option>
+                <option value="excellent">Excellent</option>
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
+                <option value="poor">Poor</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">DCC Status</label>
+              <select class="form-select" id="formDccStatus">
+                <option value="">Select DCC status...</option>
+                <option value="analogue">Analogue</option>
+                <option value="dcc-ready">DCC Ready</option>
+                <option value="dcc-fitted">DCC Fitted</option>
+                <option value="dcc-sound">DCC Sound</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
               <label class="form-label">Manufacturer</label>
               <input type="text" class="form-input" id="formManufacturer" placeholder="Start typing..." autocomplete="off" oninput="app.suggest.show('formManufacturer', 'manufacturers')" onblur="setTimeout(()=>app.suggest.hide('formManufacturer'),200)">
               <ul class="autosuggest-list" id="suggest-formManufacturer" style="display:none"></ul>
@@ -131,6 +169,17 @@
 
           <div class="form-row">
             <div class="form-group">
+              <label class="form-label">Purchase Date</label>
+              <input type="date" class="form-input" id="formPurchaseDate">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Storage Location</label>
+              <input type="text" class="form-input" id="formStorageLocation" placeholder="Where is this stored?">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
               <label class="form-label">Last Service Date</label>
               <input type="date" class="form-input" id="formServiceDate">
             </div>
@@ -138,6 +187,14 @@
               <label class="form-label">Goes Well With</label>
               <input type="text" class="form-input" id="formGoesWellWith" placeholder="e.g., Teak coaches, LNER parcels van" autocomplete="off">
               <div id="goesWellSuggestions" style="display:none;"></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Tags</label>
+            <div class="tags-input-wrapper">
+              <input type="text" class="form-input tags-input" id="formTags" placeholder="Type a tag and press Enter" onkeypress="app.handleTagInput(event)">
+              <div class="tags-container" id="formTagsContainer"></div>
             </div>
           </div>
 
@@ -177,7 +234,7 @@
   </footer>
 
   <script src="/js/reference-db.js?v=4"></script>
-  <script src="/js/app.js?v=6"></script>
+  <script src="/js/app.js?v=7"></script>
   <script>
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {

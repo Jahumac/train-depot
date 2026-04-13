@@ -590,9 +590,18 @@ const app = {
       if (filter.type === 'search') params = `?search=${encodeURIComponent(filter.value)}`;
       else if (filter.type === 'category') params = `?category=${filter.value}`;
       else if (filter.type === 'subcategory') params = `?subcategory=${filter.value}`;
+      // Tag filtering is done client-side after loading all items
     }
 
     await this.loadItems(params);
+
+    // Filter by tag if specified
+    if (filter && filter.type === 'tag') {
+      this.items = this.items.filter(item =>
+        item.tags && Array.isArray(item.tags) && item.tags.includes(filter.value)
+      );
+    }
+
     await this.loadStats();
     document.getElementById('statsBar').style.display = '';
     this.render();
@@ -621,6 +630,7 @@ const app = {
       case 'landing': main.innerHTML = this.renderLanding(); break;
       case 'catalog': main.innerHTML = this.renderCatalog(); break;
       case 'detail':  main.innerHTML = this.renderDetail();  break;
+      case 'dashboard': this.showDashboard(); break;
       case 'backup':  main.innerHTML = this.renderBackupView(); break;
     }
   },
@@ -803,6 +813,7 @@ const app = {
   renderSidebar() {
     const s = this.stats;
     const catIcon = (id) => id === 'locomotives' ? '🚂' : id === 'rolling-stock' ? '🚃' : '📦';
+    const allTags = this.getAllTagsForSidebar();
     return `
       <aside class="sidebar">
         <div class="sidebar-title">Categories</div>
@@ -843,6 +854,22 @@ const app = {
             </ul>
           `).join('')}
         </ul>
+
+        ${allTags.length > 0 ? `
+          <div class="catalog-tags-section">
+            <div class="catalog-tags-title">Tags</div>
+            <ul class="catalog-tags-list">
+              ${allTags.map(tag => `
+                <li class="catalog-tags-item ${this.currentFilter?.type === 'tag' && this.currentFilter?.value === tag.name ? 'active' : ''}"
+                    onclick="app.showCatalog({type:'tag',value:'${this.esc(tag.name)}'})">
+                  <span class="catalog-tags-item-name">${this.esc(tag.name)}</span>
+                  <span class="catalog-tags-item-count">${tag.count}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        ` : ''}
+
         <div class="sidebar-actions">
           <button class="btn btn-outline btn-sm" onclick="app.addCategory()" style="width:100%;margin-bottom:8px;">📁 Add Category</button>
           <button class="btn btn-outline btn-sm" onclick="app.openAddModal()" style="width:100%">➕ Add New Item</button>
@@ -906,8 +933,9 @@ const app = {
     const item = this.detailItem;
     if (!item) return '<div class="main-content"><p>Item not found</p></div>';
 
+    this.currentLightboxIndex = 0;
     const mainImg = item.images && item.images.length > 0
-      ? `<img src="${item.images[0]}" id="detailMainImg" alt="${this.esc(item.name)}">`
+      ? `<img src="${item.images[0]}" id="detailMainImg" alt="${this.esc(item.name)}" onclick="app.openLightbox(0)" style="cursor:pointer;">`
       : `<span class="placeholder-icon">${item.categoryId === 'locomotives' ? '🚂' : '🚃'}</span>`;
 
     const catName = this.getCategoryName(item.categoryId);
@@ -929,8 +957,8 @@ const app = {
               ${item.images && item.images.length > 1 ? `
                 <div class="detail-thumbnails">
                   ${item.images.map((img, i) => `
-                    <div class="detail-thumb ${i === 0 ? 'active' : ''}" onclick="app.switchImage('${img}', this)">
-                      <img src="${img}" alt="Photo ${i+1}">
+                    <div class="detail-thumb ${i === 0 ? 'active' : ''}" onclick="app.switchImage('${img}', this)" ondblclick="app.openLightbox(${i})">
+                      <img src="${img}" alt="Photo ${i+1}" style="cursor:pointer;">
                     </div>
                   `).join('')}
                 </div>
@@ -941,6 +969,20 @@ const app = {
               ${subcatName ? `<span class="detail-category-badge">${catName} &mdash; ${subcatName}</span>` : ''}
 
               ${item.wishlist ? '<div class="detail-wishlist-badge">⭐ Wishlist Item</div>' : ''}
+
+              ${item.runningNumber || item.productCode ? `
+                <div style="margin: 12px 0;">
+                  ${item.runningNumber ? `<div><span style="color: var(--color-text-muted); font-size: 0.85rem;">Running Number:</span> <strong>${this.esc(item.runningNumber)}</strong></div>` : ''}
+                  ${item.productCode ? `<div><span style="color: var(--color-text-muted); font-size: 0.85rem;">Product Code:</span> <strong>${this.esc(item.productCode)}</strong></div>` : ''}
+                </div>
+              ` : ''}
+
+              ${item.condition || item.dccStatus ? `
+                <div style="margin: 12px 0;">
+                  ${item.condition ? `<span class="condition-badge condition-${item.condition}">${item.condition.replace('-', ' / ')}</span>` : ''}
+                  ${item.dccStatus ? `<span class="dcc-badge dcc-${item.dccStatus}">${item.dccStatus.replace('-', ' ')}</span>` : ''}
+                </div>
+              ` : ''}
 
               <div class="detail-fields">
                 <div class="detail-field">
@@ -964,6 +1006,14 @@ const app = {
                   <span class="detail-field-value">${this.esc(item.placeOfPurchase || '—')}</span>
                 </div>
                 <div class="detail-field">
+                  <span class="detail-field-label">Purchase Date</span>
+                  <span class="detail-field-value">${item.purchaseDate ? this.formatDate(item.purchaseDate) : '—'}</span>
+                </div>
+                <div class="detail-field">
+                  <span class="detail-field-label">Storage Location</span>
+                  <span class="detail-field-value">${this.esc(item.storageLocation || '—')}</span>
+                </div>
+                <div class="detail-field">
                   <span class="detail-field-label">Last Service Date</span>
                   <span class="detail-field-value">${item.lastServiceDate ? this.formatDate(item.lastServiceDate) : '—'}</span>
                   ${this.serviceStatusBadge(item.lastServiceDate)}
@@ -973,6 +1023,19 @@ const app = {
                   <span class="detail-field-value">${this.formatDate(item.createdAt)}</span>
                 </div>
               </div>
+
+              ${item.tags && item.tags.length > 0 ? `
+                <div class="detail-section">
+                  <div class="detail-section-title">Tags</div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    ${item.tags.map(tag => `
+                      <span class="tag-chip tag-chip-readonly" onclick="app.showCatalog({ type: 'tag', value: '${this.esc(tag)}' })">
+                        ${this.esc(tag)}
+                      </span>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
 
               ${item.goesWellWith ? `
                 <div class="detail-section">
@@ -987,6 +1050,8 @@ const app = {
                   <div class="detail-section-text">${this.esc(item.historicalBackground)}</div>
                 </div>
               ` : ''}
+
+              ${this.renderServiceLog(item)}
             </div>
           </div>
         </div>
@@ -1154,6 +1219,11 @@ const app = {
     document.getElementById('modalTitle').textContent = 'Add New Item';
     this.populateCategorySelects();
     this.clearForm();
+    // Set smart defaults
+    document.getElementById('formCondition').value = 'excellent-boxed';
+    document.getElementById('formDccStatus').value = 'analogue';
+    // Initialize empty tags
+    this.renderFormTags([]);
     // Reset reference notices
     const notice = document.getElementById('refImageNotice');
     if (notice) notice.style.display = 'none';
@@ -1175,15 +1245,24 @@ const app = {
     document.getElementById('formCategory').value = item.categoryId || '';
     this.updateSubcategories();
     document.getElementById('formSubcategory').value = item.subcategoryId || '';
+    document.getElementById('formRunningNumber').value = item.runningNumber || '';
+    document.getElementById('formProductCode').value = item.productCode || '';
+    document.getElementById('formCondition').value = item.condition || '';
+    document.getElementById('formDccStatus').value = item.dccStatus || '';
     document.getElementById('formManufacturer').value = item.manufacturer || '';
     document.getElementById('formLivery').value = item.livery || '';
     document.getElementById('formPrice').value = item.purchasePrice || '';
     document.getElementById('formCurrentValue').value = item.currentValue || '';
     document.getElementById('formPlace').value = item.placeOfPurchase || '';
+    document.getElementById('formPurchaseDate').value = item.purchaseDate || '';
+    document.getElementById('formStorageLocation').value = item.storageLocation || '';
     document.getElementById('formServiceDate').value = item.lastServiceDate || '';
     document.getElementById('formGoesWellWith').value = item.goesWellWith || '';
     document.getElementById('formHistory').value = item.historicalBackground || '';
     document.getElementById('formWishlist').checked = item.wishlist || false;
+
+    // Render tags
+    this.renderFormTags(item.tags || []);
 
     this.renderUploadPreviews();
     document.getElementById('itemModal').classList.add('active');
@@ -1325,19 +1404,29 @@ const app = {
       const newImageUrls = await this.uploadImages();
       const allImages = [...this.existingImages, ...newImageUrls];
 
+      // Get tags from the form
+      const tags = this.getFormTags();
+
       const itemData = {
         name,
         categoryId,
         subcategoryId,
+        runningNumber: document.getElementById('formRunningNumber').value.trim(),
+        productCode: document.getElementById('formProductCode').value.trim(),
+        condition: document.getElementById('formCondition').value,
+        dccStatus: document.getElementById('formDccStatus').value,
         manufacturer: document.getElementById('formManufacturer').value.trim(),
         livery: document.getElementById('formLivery').value.trim(),
         purchasePrice: document.getElementById('formPrice').value || 0,
         currentValue: document.getElementById('formCurrentValue').value || 0,
         placeOfPurchase: document.getElementById('formPlace').value.trim(),
+        purchaseDate: document.getElementById('formPurchaseDate').value,
+        storageLocation: document.getElementById('formStorageLocation').value.trim(),
         lastServiceDate: document.getElementById('formServiceDate').value,
         goesWellWith: document.getElementById('formGoesWellWith').value.trim(),
         historicalBackground: document.getElementById('formHistory').value.trim(),
         wishlist: document.getElementById('formWishlist').checked,
+        tags: tags,
         images: allImages
       };
 
@@ -1413,6 +1502,512 @@ const app = {
     if (mainImg) mainImg.src = src;
     document.querySelectorAll('.detail-thumb').forEach(t => t.classList.remove('active'));
     if (thumbEl) thumbEl.classList.add('active');
+  },
+
+  openLightbox(imageIndex) {
+    const item = this.detailItem;
+    if (!item || !item.images || item.images.length === 0) return;
+    this.currentLightboxIndex = imageIndex;
+    this.renderLightbox();
+  },
+
+  renderLightbox() {
+    const item = this.detailItem;
+    if (!item || !item.images || item.images.length === 0) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'lightbox-overlay show';
+    overlay.id = 'lightboxOverlay';
+    overlay.onclick = (e) => {
+      if (e.target === overlay) this.closeLightbox();
+    };
+
+    const img = item.images[this.currentLightboxIndex];
+    const showPrev = item.images.length > 1 && this.currentLightboxIndex > 0;
+    const showNext = item.images.length > 1 && this.currentLightboxIndex < item.images.length - 1;
+
+    overlay.innerHTML = `
+      <div class="lightbox-container">
+        <img src="${img}" alt="Photo" class="lightbox-image">
+        <button class="lightbox-close" onclick="app.closeLightbox()">&times;</button>
+        ${showPrev ? '<button class="lightbox-nav lightbox-prev" onclick="app.prevLightboxImage()">&#10094;</button>' : ''}
+        ${showNext ? '<button class="lightbox-nav lightbox-next" onclick="app.nextLightboxImage()">&#10095;</button>' : ''}
+        <div class="lightbox-counter">${this.currentLightboxIndex + 1} / ${item.images.length}</div>
+      </div>
+    `;
+
+    const existing = document.getElementById('lightboxOverlay');
+    if (existing) existing.remove();
+    document.body.appendChild(overlay);
+
+    // Add keyboard support
+    const handleKeydown = (e) => {
+      if (e.key === 'Escape') this.closeLightbox();
+      if (e.key === 'ArrowLeft' && showPrev) this.prevLightboxImage();
+      if (e.key === 'ArrowRight' && showNext) this.nextLightboxImage();
+    };
+    overlay._keyHandler = handleKeydown;
+    document.addEventListener('keydown', handleKeydown);
+  },
+
+  closeLightbox() {
+    const overlay = document.getElementById('lightboxOverlay');
+    if (overlay) {
+      if (overlay._keyHandler) {
+        document.removeEventListener('keydown', overlay._keyHandler);
+      }
+      overlay.remove();
+    }
+  },
+
+  prevLightboxImage() {
+    if (this.currentLightboxIndex > 0) {
+      this.currentLightboxIndex--;
+      this.renderLightbox();
+    }
+  },
+
+  nextLightboxImage() {
+    const item = this.detailItem;
+    if (item && item.images && this.currentLightboxIndex < item.images.length - 1) {
+      this.currentLightboxIndex++;
+      this.renderLightbox();
+    }
+  },
+
+  // ==================== Tags Management ====================
+
+  renderFormTags(tags) {
+    const container = document.getElementById('formTagsContainer');
+    if (!container) return;
+    container.innerHTML = tags.map(tag => `
+      <span class="tag-chip">
+        ${this.esc(tag)}
+        <span class="tag-chip-remove" onclick="app.removeFormTag('${this.esc(tag)}')">×</span>
+      </span>
+    `).join('');
+  },
+
+  getFormTags() {
+    const container = document.getElementById('formTagsContainer');
+    if (!container) return [];
+    const chips = container.querySelectorAll('.tag-chip');
+    return Array.from(chips).map(chip => {
+      const text = chip.textContent.trim();
+      return text.replace(/×$/, '').trim();
+    });
+  },
+
+  removeFormTag(tag) {
+    const tags = this.getFormTags();
+    const idx = tags.indexOf(tag);
+    if (idx !== -1) {
+      tags.splice(idx, 1);
+      this.renderFormTags(tags);
+    }
+  },
+
+  handleTagInput(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const input = document.getElementById('formTags');
+      const tag = input.value.trim();
+      if (!tag) return;
+
+      const tags = this.getFormTags();
+      if (!tags.includes(tag)) {
+        tags.push(tag);
+        this.renderFormTags(tags);
+      }
+      input.value = '';
+    }
+  },
+
+  // ==================== Product Code Auto-Detect Manufacturer ====================
+
+  autoDetectManufacturer() {
+    const productCode = document.getElementById('formProductCode').value.trim().toUpperCase();
+    if (!productCode) return;
+
+    let detected = '';
+    if (productCode.startsWith('R')) detected = 'Hornby';
+    else if (productCode.match(/^3[1238]-/)) detected = 'Bachmann';
+    else if (productCode.startsWith('4S-')) detected = 'Dapol';
+    else if (productCode.startsWith('OR76-')) detected = 'Oxford Rail';
+    else if (productCode.startsWith('ACC')) detected = 'Accurascale';
+
+    if (detected) {
+      document.getElementById('formManufacturer').value = detected;
+    }
+  },
+
+  // ==================== Service Log ====================
+
+  renderServiceLog(item) {
+    const formHtml = `
+      <div class="service-log-form" id="serviceLogForm">
+        <div style="margin-bottom: 8px;">
+          <label style="display: block; font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 4px;">Service Date</label>
+          <input type="date" id="serviceLogDate" class="form-input" style="width: 100%; padding: 8px;">
+        </div>
+        <div style="margin-bottom: 8px;">
+          <label style="display: block; font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 4px;">Notes</label>
+          <textarea id="serviceLogNote" class="form-input" placeholder="What was serviced?" style="width: 100%; padding: 8px; resize: vertical; min-height: 60px;"></textarea>
+        </div>
+        <div class="service-log-buttons">
+          <button class="btn btn-outline btn-sm" onclick="app.toggleServiceLogForm()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="app.addServiceLogEntry()">Save Entry</button>
+        </div>
+      </div>
+    `;
+
+    if (!item.serviceLog || item.serviceLog.length === 0) {
+      return `
+        <div class="service-log-section">
+          <div class="service-log-title">Service Log</div>
+          <p style="color: var(--color-text-muted); font-size: 0.95rem;">No service entries yet.</p>
+          <button class="btn btn-outline btn-sm" onclick="app.toggleServiceLogForm()">+ Add Service Entry</button>
+          ${formHtml}
+        </div>
+      `;
+    }
+
+    const sorted = [...item.serviceLog].sort((a, b) =>
+      new Date(b.date) - new Date(a.date)
+    );
+
+    return `
+      <div class="service-log-section">
+        <div class="service-log-title">Service Log</div>
+        <div class="service-log-timeline">
+          ${sorted.map(entry => `
+            <div class="service-log-entry">
+              <div class="service-log-date">${this.formatDate(entry.date)}</div>
+              <div class="service-log-note">${this.esc(entry.note)}</div>
+            </div>
+          `).join('')}
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="app.toggleServiceLogForm()" style="margin-top: 12px;">+ Add Service Entry</button>
+        ${formHtml}
+      </div>
+    `;
+  },
+
+  toggleServiceLogForm() {
+    const form = document.getElementById('serviceLogForm');
+    if (form) {
+      form.classList.toggle('show');
+    }
+  },
+
+  async addServiceLogEntry() {
+    const dateInput = document.getElementById('serviceLogDate');
+    const noteInput = document.getElementById('serviceLogNote');
+    const date = dateInput.value;
+    const note = noteInput.value.trim();
+
+    if (!date || !note) {
+      this.toast('Please enter both date and note', 'error');
+      return;
+    }
+
+    try {
+      const item = await this.api(`/api/items/${this.detailItem.id}/service-log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, note })
+      });
+      this.detailItem = item;
+      this.showDetail(this.detailItem.id);
+      this.toast('Service entry logged \u2014 keeping her running smoothly!');
+    } catch (e) { /* toast shown */ }
+  },
+
+  // ==================== Dashboard ====================
+
+  async showDashboard() {
+    this.currentView = 'dashboard';
+    this.updateNav();
+    const main = document.getElementById('mainContent');
+    main.innerHTML = '<div class="main-content" style="text-align: center; padding: 40px;"><p>Loading dashboard...</p></div>';
+
+    try {
+      const html = this.renderDashboard();
+      main.innerHTML = html;
+      this.drawDashboardCharts();
+    } catch (e) {
+      this.toast('Failed to load dashboard', 'error');
+    }
+  },
+
+  renderDashboard() {
+    const items = this.items;
+    const stats = this.stats;
+
+    const totalSpent = stats.totalSpent;
+    const totalValue = stats.totalCurrentValue;
+    const gain = totalValue - totalSpent;
+    const gainPercent = totalSpent > 0 ? ((gain / totalSpent) * 100).toFixed(1) : 0;
+
+    // Group by manufacturer
+    const byManufacturer = {};
+    items.forEach(item => {
+      const mfg = item.manufacturer || 'Unknown';
+      byManufacturer[mfg] = (byManufacturer[mfg] || 0) + 1;
+    });
+
+    // Group by condition
+    const byCondition = {};
+    items.forEach(item => {
+      const cond = item.condition || 'Not specified';
+      byCondition[cond] = (byCondition[cond] || 0) + 1;
+    });
+
+    // Group by DCC status
+    const byDccStatus = {};
+    items.forEach(item => {
+      const dcc = item.dccStatus || 'Not specified';
+      byDccStatus[dcc] = (byDccStatus[dcc] || 0) + 1;
+    });
+
+    // Items by month added
+    const byMonth = {};
+    items.forEach(item => {
+      const date = new Date(item.createdAt);
+      const month = date.toLocaleString('default', { year: 'numeric', month: 'short' });
+      byMonth[month] = (byMonth[month] || 0) + 1;
+    });
+
+    // Top 5 valuable items
+    const topItems = items
+      .filter(i => i.currentValue > 0)
+      .sort((a, b) => b.currentValue - a.currentValue)
+      .slice(0, 5);
+
+    return `
+      <div class="dashboard-container">
+        <h1 style="margin-bottom: 30px;">Collection Dashboard</h1>
+
+        <div class="dashboard-grid">
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">Total Items</div>
+            <div class="dashboard-card-value">${items.length}</div>
+          </div>
+
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">Total Spent</div>
+            <div class="dashboard-card-value">${this.settings.currency}${totalSpent.toFixed(2)}</div>
+          </div>
+
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">Current Value</div>
+            <div class="dashboard-card-value">${this.settings.currency}${totalValue.toFixed(2)}</div>
+            <div class="dashboard-card-change ${gain >= 0 ? 'positive' : 'negative'}">
+              ${gain >= 0 ? '↑' : '↓'} ${this.settings.currency}${Math.abs(gain).toFixed(2)} (${gainPercent}%)
+            </div>
+          </div>
+
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">Locomotives</div>
+            <div class="dashboard-card-value">${stats.locomotiveCount}</div>
+          </div>
+
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">Rolling Stock</div>
+            <div class="dashboard-card-value">${stats.rollingStockCount}</div>
+          </div>
+
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">Wishlist Items</div>
+            <div class="dashboard-card-value">${stats.wishlistCount}</div>
+          </div>
+        </div>
+
+        <div class="dashboard-chart-container">
+          <div class="dashboard-chart-title">Items Added Over Time</div>
+          <canvas id="chartTimeline" width="800" height="250"></canvas>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+          <div class="dashboard-chart-container">
+            <div class="dashboard-chart-title">By Manufacturer</div>
+            <canvas id="chartManufacturer" width="400" height="300"></canvas>
+          </div>
+
+          <div class="dashboard-chart-container">
+            <div class="dashboard-chart-title">By Condition</div>
+            <canvas id="chartCondition" width="400" height="300"></canvas>
+          </div>
+
+          <div class="dashboard-chart-container">
+            <div class="dashboard-chart-title">By DCC Status</div>
+            <canvas id="chartDccStatus" width="400" height="300"></canvas>
+          </div>
+
+          <div class="dashboard-list">
+            <div class="dashboard-list-title">Top 5 Valuable Items</div>
+            <div>
+              ${topItems.length > 0 ? topItems.map(item => `
+                <div class="dashboard-list-item">
+                  <div class="dashboard-list-name">${this.esc(item.name)}</div>
+                  <div class="dashboard-list-value">${this.settings.currency}${item.currentValue.toFixed(2)}</div>
+                </div>
+              `).join('') : '<p style="color: var(--color-text-muted); padding: 12px 0;">No items with current value recorded.</p>'}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  drawDashboardCharts() {
+    const items = this.items;
+    const settings = this.settings;
+
+    // Timeline chart
+    const byMonth = {};
+    items.forEach(item => {
+      const date = new Date(item.createdAt);
+      const month = date.toLocaleString('default', { year: '2-digit', month: 'short' });
+      byMonth[month] = (byMonth[month] || 0) + 1;
+    });
+    const months = Object.keys(byMonth).slice(-12);
+    const counts = months.map(m => byMonth[m]);
+    this.drawBarChart('chartTimeline', months, [{ label: 'Items', data: counts, color: '#c9a227' }], { yMax: Math.max(...counts, 1) + 1 });
+
+    // By manufacturer
+    const byMfg = {};
+    items.forEach(item => {
+      const mfg = item.manufacturer || 'Unknown';
+      byMfg[mfg] = (byMfg[mfg] || 0) + 1;
+    });
+    const topMfg = Object.entries(byMfg).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    this.drawBarChart('chartManufacturer', topMfg.map(x => x[0]), [{ label: 'Count', data: topMfg.map(x => x[1]), color: '#40916c' }], { yMax: Math.max(...topMfg.map(x => x[1]), 1) + 1 });
+
+    // By condition
+    const byCondition = {};
+    items.forEach(item => {
+      const cond = item.condition || 'Not specified';
+      byCondition[cond] = (byCondition[cond] || 0) + 1;
+    });
+    const condLabels = Object.keys(byCondition);
+    const condColors = { 'mint-boxed': '#66bb6a', 'mint': '#81c784', 'excellent-boxed': '#64b5f6', 'excellent': '#90caf9', 'good': '#ffb74d', 'fair': '#ffb74d', 'poor': '#ef5350' };
+    this.drawPieChart('chartCondition', condLabels, Object.values(byCondition), condLabels.map(c => condColors[c] || '#9e9e9e'));
+
+    // By DCC status
+    const byDcc = {};
+    items.forEach(item => {
+      const dcc = item.dccStatus || 'Not specified';
+      byDcc[dcc] = (byDcc[dcc] || 0) + 1;
+    });
+    const dccLabels = Object.keys(byDcc);
+    const dccColors = { 'analogue': '#9e9e9e', 'dcc-ready': '#81c784', 'dcc-fitted': '#64b5f6', 'dcc-sound': '#ffb74d' };
+    this.drawPieChart('chartDccStatus', dccLabels, Object.values(byDcc), dccLabels.map(d => dccColors[d] || '#9e9e9e'));
+  },
+
+  drawBarChart(canvasId, labels, datasets, options = {}) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const yMax = options.yMax || Math.max(...datasets.flatMap(d => d.data), 1);
+
+    const padding = 40;
+    const width = canvas.width - padding * 2;
+    const height = canvas.height - padding * 2;
+    const barWidth = Math.max(width / (labels.length * 1.5), 20);
+    const spacing = width / labels.length;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = '#888';
+    ctx.textAlign = 'center';
+
+    // Draw axes
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padding, height + padding);
+    ctx.lineTo(width + padding, height + padding);
+    ctx.stroke();
+
+    // Draw bars
+    datasets.forEach((dataset, dsIndex) => {
+      const xOffset = dsIndex * (barWidth / datasets.length);
+      dataset.data.forEach((value, i) => {
+        const x = padding + i * spacing + xOffset + spacing / (datasets.length * 2);
+        const barHeight = (value / yMax) * height;
+        const y = height + padding - barHeight;
+
+        ctx.fillStyle = dataset.color;
+        ctx.fillRect(x, y, barWidth / datasets.length, barHeight);
+      });
+    });
+
+    // Draw labels
+    ctx.fillStyle = '#666';
+    labels.forEach((label, i) => {
+      const x = padding + i * spacing + spacing / 2;
+      const y = height + padding + 20;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(-Math.PI / 6);
+      ctx.textAlign = 'right';
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
+    });
+  },
+
+  drawPieChart(canvasId, labels, data, colors) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = Math.min(canvas.width, canvas.height) / 2 - 40;
+
+    const total = data.reduce((a, b) => a + b, 0);
+    let currentAngle = -Math.PI / 2;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    data.forEach((value, i) => {
+      const sliceAngle = (value / total) * 2 * Math.PI;
+      ctx.fillStyle = colors[i];
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Draw label
+      if (value > 0) {
+        const labelAngle = currentAngle + sliceAngle / 2;
+        const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
+        const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(value, labelX, labelY);
+      }
+
+      currentAngle += sliceAngle;
+    });
+
+    // Draw legend
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'left';
+    let legendY = 10;
+    labels.forEach((label, i) => {
+      ctx.fillStyle = colors[i];
+      ctx.fillRect(10, legendY, 12, 12);
+      ctx.fillStyle = '#666';
+      ctx.fillText(label, 25, legendY + 10);
+      legendY += 20;
+    });
   },
 
   // ==================== Export / Import ====================
@@ -1787,11 +2382,26 @@ const app = {
     return '';
   },
 
+  getAllTagsForSidebar() {
+    const tagCounts = {};
+    this.items.forEach(item => {
+      if (item.tags && Array.isArray(item.tags)) {
+        item.tags.forEach(tag => {
+          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        });
+      }
+    });
+    return Object.entries(tagCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  },
+
   getFilterTitle() {
     if (!this.currentFilter) return 'All Items';
     if (this.currentFilter.type === 'search') return `Search: "${this.currentFilter.value}"`;
     if (this.currentFilter.type === 'category') return this.getCategoryName(this.currentFilter.value) || 'Category';
     if (this.currentFilter.type === 'subcategory') return this.getSubcategoryName(this.currentFilter.value) || 'Subcategory';
+    if (this.currentFilter.type === 'tag') return `Tag: "${this.currentFilter.value}"`;
     return 'All Items';
   },
 

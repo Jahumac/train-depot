@@ -460,6 +460,22 @@ async function handleApiRequest(req, res, pathname) {
     return sendJson(res, 200, { message: 'Item deleted' });
   }
 
+  // POST /api/items/:id/service-log — add service log entry
+  const serviceLogMatch = pathname.match(/^\/api\/items\/([^/]+)\/service-log$/);
+  if (serviceLogMatch && req.method === 'POST') {
+    const body = await readBody(req);
+    const data = parseJsonBody(body);
+    if (!data || !data.date || !data.note) {
+      return sendError(res, 400, 'Service log entry must have date and note');
+    }
+    const item = db.getItemById(serviceLogMatch[1]);
+    if (!item) return sendError(res, 404, 'Item not found');
+    if (!item.serviceLog) item.serviceLog = [];
+    item.serviceLog.push({ date: data.date, note: data.note });
+    const updated = db.updateItem(serviceLogMatch[1], { serviceLog: item.serviceLog });
+    return sendJson(res, 200, updated);
+  }
+
   // POST /api/items/csv-import
   if (pathname === '/api/items/csv-import' && req.method === 'POST') {
     const contentType = req.headers['content-type'] || '';
@@ -667,6 +683,18 @@ async function handleApiRequest(req, res, pathname) {
     if (!data) return sendError(res, 400, 'Invalid JSON');
     const settings = db.updateSettings(data);
     return sendJson(res, 200, settings);
+  }
+
+  // GET /api/tags
+  if (pathname === '/api/tags' && req.method === 'GET') {
+    return sendJson(res, 200, db.getAllTags());
+  }
+
+  // GET /api/tags/:tag/items
+  const tagItemsMatch = pathname.match(/^\/api\/tags\/([^/]+)\/items$/);
+  if (tagItemsMatch && req.method === 'GET') {
+    const items = db.getItemsByTag(decodeURIComponent(tagItemsMatch[1]));
+    return sendJson(res, 200, items);
   }
 
   // GET /api/stats

@@ -1622,3 +1622,551 @@ img { max-width: 100%; height: auto; }
   margin-top: 4px;
   font-style: italic;
 }
+
+/* ==================== Tags Input & Chips ==================== */
+
+.tags-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tags-input {
+  width: 100%;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--color-accent-light);
+  color: var(--color-primary-dark);
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  animation: tagSlideIn 0.2s ease;
+}
+
+@keyframes tagSlideIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.tag-chip-remove {
+  cursor: pointer;
+  font-weight: bold;
+  opacity: 0.6;
+  transition: opacity var(--transition);
+}
+
+.tag-chip-remove:hover {
+  opacity: 1;
+}
+
+.tag-chip-readonly {
+  background: var(--color-accent);
+  color: white;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.tag-chip-readonly:hover {
+  background: var(--color-accent-dark);
+  transform: translateY(-2px);
+}
+
+/* ==================== Condition & DCC Status Badges ==================== */
+
+.condition-badge, .dcc-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+
+.condition-mint-boxed, .condition-mint {
+  background: #c8e6c9;
+  color: #1b5e20;
+}
+
+.condition-excellent-boxed, .condition-excellent {
+  background: #bbdefb;
+  color: #0d47a1;
+}
+
+.condition-good {
+  background: #ffe0b2;
+  color: #e65100;
+}
+
+.condition-fair {
+  background: #ffccbc;
+  color: #bf360c;
+}
+
+.condition-poor {
+  background: #ffcdd2;
+  color: #b71c1c;
+}
+
+[data-theme="dark"] .condition-mint-boxed,
+[data-theme="dark"] .condition-mint {
+  background: #388e3c;
+  color: #e8f5e9;
+}
+
+[data-theme="dark"] .condition-excellent-boxed,
+[data-theme="dark"] .condition-excellent {
+  background: #1976d2;
+  color: #e3f2fd;
+}
+
+[data-theme="dark"] .condition-good {
+  background: #f57c00;
+  color: #fff3e0;
+}
+
+[data-theme="dark"] .condition-fair {
+  background: #d84315;
+  color: #ffebee;
+}
+
+[data-theme="dark"] .condition-poor {
+  background: #c62828;
+  color: #ffebee;
+}
+
+.dcc-analogue {
+  background: #e0e0e0;
+  color: #424242;
+}
+
+.dcc-dcc-ready {
+  background: #c5e1a5;
+  color: #33691e;
+}
+
+.dcc-dcc-fitted {
+  background: #80deea;
+  color: #00796b;
+}
+
+.dcc-dcc-sound {
+  background: #ffe082;
+  color: #f57f17;
+}
+
+[data-theme="dark"] .dcc-analogue {
+  background: #616161;
+  color: #f5f5f5;
+}
+
+[data-theme="dark"] .dcc-dcc-ready {
+  background: #689f38;
+  color: #f1f8e9;
+}
+
+[data-theme="dark"] .dcc-dcc-fitted {
+  background: #0097a7;
+  color: #e0f2f1;
+}
+
+[data-theme="dark"] .dcc-dcc-sound {
+  background: #fbc02d;
+  color: #f57f17;
+}
+
+/* ==================== Service Log Timeline ==================== */
+
+.service-log-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+.service-log-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--color-text);
+}
+
+.service-log-timeline {
+  position: relative;
+  padding-left: 24px;
+}
+
+.service-log-timeline::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-accent);
+}
+
+.service-log-entry {
+  position: relative;
+  margin-bottom: 20px;
+  padding: 12px;
+  background: var(--color-bg-hover);
+  border-radius: var(--radius-sm);
+}
+
+.service-log-entry::before {
+  content: '';
+  position: absolute;
+  left: -28px;
+  top: 16px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-bg);
+}
+
+.service-log-date {
+  font-weight: 600;
+  color: var(--color-accent-dark);
+  font-size: 0.9rem;
+}
+
+.service-log-note {
+  margin-top: 4px;
+  color: var(--color-text-light);
+  font-size: 0.95rem;
+}
+
+.service-log-form {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  margin-top: 12px;
+  display: none;
+}
+
+.service-log-form.show {
+  display: block;
+}
+
+.service-log-form input,
+.service-log-form textarea {
+  width: 100%;
+  padding: 8px 12px;
+  margin: 4px 0 8px 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-main);
+}
+
+.service-log-form textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.service-log-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ==================== Image Lightbox ==================== */
+
+.lightbox-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 2000;
+  animation: fadeIn 0.25s ease;
+}
+
+.lightbox-overlay.show {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lightbox-container {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-image {
+  max-width: 100%;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  z-index: 2001;
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  z-index: 2001;
+}
+
+.lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.lightbox-prev {
+  left: 20px;
+}
+
+.lightbox-next {
+  right: 20px;
+}
+
+.lightbox-counter {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 0.9rem;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 8px 16px;
+  border-radius: 20px;
+}
+
+/* ==================== Dashboard Styles ==================== */
+
+.dashboard-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.dashboard-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition);
+}
+
+.dashboard-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.dashboard-card-title {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.dashboard-card-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 4px;
+}
+
+.dashboard-card-unit {
+  font-size: 1rem;
+  color: var(--color-text-light);
+  font-weight: 400;
+}
+
+.dashboard-card-change {
+  font-size: 0.9rem;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.dashboard-card-change.positive {
+  color: var(--color-success);
+}
+
+.dashboard-card-change.negative {
+  color: var(--color-danger);
+}
+
+.dashboard-chart-container {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-chart-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--color-text);
+}
+
+.dashboard-chart-canvas {
+  width: 100%;
+  display: block;
+}
+
+.dashboard-list {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-list-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--color-text);
+}
+
+.dashboard-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.95rem;
+}
+
+.dashboard-list-item:last-child {
+  border-bottom: none;
+}
+
+.dashboard-list-name {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.dashboard-list-value {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* ==================== Tags Sidebar Section ==================== */
+
+.catalog-tags-section {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.catalog-tags-title {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.catalog-tags-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.catalog-tags-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--color-bg-hover);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.catalog-tags-item:hover {
+  background: var(--color-accent-light);
+  color: var(--color-primary-dark);
+}
+
+.catalog-tags-item.active {
+  background: var(--color-accent);
+  color: white;
+  font-weight: 600;
+}
+
+.catalog-tags-item-name {
+  flex: 1;
+}
+
+.catalog-tags-item-count {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  margin-left: 8px;
+}
