@@ -3,13 +3,13 @@ FROM node:18-alpine
 LABEL maintainer="Janusz <jahumac@gmail.com>"
 LABEL org.opencontainers.image.title="Train Depot"
 LABEL org.opencontainers.image.description="Self-hosted model train collection catalog"
-LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.version="1.4.0"
 LABEL org.opencontainers.image.source="https://github.com/jahumac/train-depot"
 
 WORKDIR /app
 
 # Copy application files
-COPY package.json server.js database.js ./
+COPY package.json server.js database.js valuation.js ./
 COPY seed.js start.sh ./
 COPY static/ ./static/
 
