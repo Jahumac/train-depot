@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./database');
+const valuation = require('./valuation');
 
 const PORT = process.env.PORT || 8005;
 const UPLOAD_DIR = path.join(__dirname, 'data', 'uploads');
@@ -803,6 +804,207 @@ async function handleApiRequest(req, res, pathname) {
     return sendJson(res, 200, { enabled: !!token, token: token || null });
   }
 
+  // === Valuation Routes ===
+
+  // POST /api/items/:id/valuate — check current market value for a single item
+  const valuateMatch = pathname.match(/^\/api\/items\/([^/]+)\/valuate$/);
+  if (valuateMatch && req.method === 'POST') {
+    const item = db.getItemById(valuateMatch[1]);
+    if (!item) return sendError(res, 404, 'Item not found');
+
+    const settings = db.getSettingsInternal();
+    if (!settings.ebayAppId || !settings.ebayCertId) {
+      return sendError(res, 400, 'eBay API not configured. Go to Settings → eBay Valuation to add your credentials.');
+    }
+
+    try {
+      const result = await valuation.searchEbay(item, {
+        appId: settings.ebayAppId,
+        certId: settings.ebayCertId,
+        sandbox: settings.ebaySandbox || false
+      });
+
+      // Save valuation data to the item
+      const valuationData = {
+        ...result,
+        // Remove full listing URLs for storage (keep them lean)
+        listings: result.listings.map(l => ({
+          title: l.title,
+          price: l.price,
+          condition: l.condition,
+          url: l.url
+        }))
+      };
+
+      // Update the item with valuation data and auto-set currentValue if found
+      const updates = { valuation: valuationData };
+      if (result.found && result.marketValue) {
+        updates.currentValue = result.marketValue;
+      }
+      const updated = db.updateItem(valuateMatch[1], updates);
+
+      return sendJson(res, 200, { item: updated, valuation: valuationData });
+    } catch (err) {
+      console.error('Valuation error:', err.message);
+      return sendError(res, 500, 'Valuation failed: ' + err.message);
+    }
+  }
+
+  // POST /api/valuations/refresh — batch refresh valuations for all items (or stale items)
+  if (pathname === '/api/valuations/refresh' && req.method === 'POST') {
+    const settings = db.getSettingsInternal();
+    if (!settings.ebayAppId || !settings.ebayCertId) {
+      return sendError(res, 400, 'eBay API not configured');
+    }
+
+    const body = await readBody(req, 1024);
+    const data = parseJsonBody(body) || {};
+    const staleOnly = data.staleOnly !== false; // default: only refresh stale items
+    const staleDays = settings.valuationRefreshDays || 7;
+
+    let items = db.getAllItems().filter(i => !i.wishlist); // skip wishlist items
+
+    if (staleOnly) {
+      const cutoff = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000).toISOString();
+      items = items.filter(i =>
+        !i.valuation || !i.valuation.valuationDate || i.valuation.valuationDate < cutoff
+      );
+    }
+
+    if (items.length === 0) {
+      return sendJson(res, 200, { message: 'All valuations are up to date', refreshed: 0, total: db.getAllItems().length });
+    }
+
+    // Cap at 50 items per batch to avoid timeout
+    const batch = items.slice(0, 50);
+
+    try {
+      const results = await valuation.batchValuate(batch, {
+        appId: settings.ebayAppId,
+        certId: settings.ebayCertId,
+        sandbox: settings.ebaySandbox || false
+      });
+
+      let updated = 0;
+      for (const result of results) {
+        if (result.valuation) {
+          const updates = { valuation: result.valuation };
+          if (result.valuation.found && result.valuation.marketValue) {
+            updates.currentValue = result.valuation.marketValue;
+          }
+          db.updateItem(result.itemId, updates);
+          updated++;
+        }
+      }
+
+      return sendJson(res, 200, {
+        message: `Refreshed ${updated} of ${batch.length} items`,
+        refreshed: updated,
+        total: items.length,
+        remaining: Math.max(0, items.length - batch.length)
+      });
+    } catch (err) {
+      return sendError(res, 500, 'Batch valuation failed: ' + err.message);
+    }
+  }
+
+  // GET /api/valuations/summary — collection valuation summary
+  if (pathname === '/api/valuations/summary' && req.method === 'GET') {
+    const items = db.getAllItems().filter(i => !i.wishlist);
+    const valued = items.filter(i => i.valuation && i.valuation.found);
+    const totalPurchase = items.reduce((sum, i) => sum + (i.purchasePrice || 0), 0);
+    const totalMarket = valued.reduce((sum, i) => sum + (i.valuation.marketValue || 0), 0);
+    const totalCurrentValue = items.reduce((sum, i) => sum + (i.currentValue || 0), 0);
+
+    // Best and worst deals
+    const withGains = valued
+      .filter(i => i.purchasePrice > 0)
+      .map(i => ({
+        id: i.id,
+        name: i.name,
+        purchasePrice: i.purchasePrice,
+        marketValue: i.valuation.marketValue,
+        gain: i.valuation.marketValue - i.purchasePrice,
+        gainPercent: ((i.valuation.marketValue - i.purchasePrice) / i.purchasePrice * 100)
+      }))
+      .sort((a, b) => b.gainPercent - a.gainPercent);
+
+    const staleCount = items.filter(i => {
+      if (!i.valuation || !i.valuation.valuationDate) return true;
+      const age = Date.now() - new Date(i.valuation.valuationDate).getTime();
+      return age > 7 * 24 * 60 * 60 * 1000;
+    }).length;
+
+    return sendJson(res, 200, {
+      totalItems: items.length,
+      valuedItems: valued.length,
+      unvalued: items.length - valued.length,
+      staleCount,
+      totalPurchasePrice: Math.round(totalPurchase * 100) / 100,
+      totalMarketValue: Math.round(totalMarket * 100) / 100,
+      totalCurrentValue: Math.round(totalCurrentValue * 100) / 100,
+      overallGain: Math.round((totalMarket - totalPurchase) * 100) / 100,
+      overallGainPercent: totalPurchase > 0 ? Math.round((totalMarket - totalPurchase) / totalPurchase * 10000) / 100 : 0,
+      bestDeals: withGains.slice(0, 5),
+      worstDeals: withGains.slice(-5).reverse()
+    });
+  }
+
+  // PUT /api/settings/ebay — save eBay API credentials (separate from general settings for security)
+  if (pathname === '/api/settings/ebay' && req.method === 'PUT') {
+    const body = await readBody(req, 2048);
+    const data = parseJsonBody(body);
+    if (!data) return sendError(res, 400, 'Invalid JSON');
+
+    const updates = {};
+    if (data.ebayAppId !== undefined) updates.ebayAppId = data.ebayAppId.trim();
+    if (data.ebayCertId !== undefined) updates.ebayCertId = data.ebayCertId.trim();
+    if (data.ebaySandbox !== undefined) updates.ebaySandbox = !!data.ebaySandbox;
+    if (data.valuationAutoRefresh !== undefined) updates.valuationAutoRefresh = !!data.valuationAutoRefresh;
+    if (data.valuationRefreshDays !== undefined) updates.valuationRefreshDays = parseInt(data.valuationRefreshDays) || 7;
+
+    // Clear token cache when credentials change
+    if (data.ebayAppId !== undefined || data.ebayCertId !== undefined) {
+      valuation.clearTokenCache();
+    }
+
+    const settings = db.updateSettings(updates);
+    return sendJson(res, 200, { message: 'eBay settings saved', settings });
+  }
+
+  // POST /api/settings/ebay/test — test eBay API connection
+  if (pathname === '/api/settings/ebay/test' && req.method === 'POST') {
+    const settings = db.getSettingsInternal();
+    if (!settings.ebayAppId || !settings.ebayCertId) {
+      return sendError(res, 400, 'eBay credentials not configured');
+    }
+
+    try {
+      // Try to search for a well-known model to test the connection
+      const testItem = { name: 'Hornby Flying Scotsman', manufacturer: 'Hornby', productCode: 'R3834' };
+      const result = await valuation.searchEbay(testItem, {
+        appId: settings.ebayAppId,
+        certId: settings.ebayCertId,
+        sandbox: settings.ebaySandbox || false
+      });
+
+      return sendJson(res, 200, {
+        success: true,
+        message: `Connection successful! Found ${result.listingsAnalysed} listings for test search.`,
+        testResult: {
+          found: result.found,
+          listingsAnalysed: result.listingsAnalysed,
+          samplePrice: result.marketValue
+        }
+      });
+    } catch (err) {
+      return sendJson(res, 200, {
+        success: false,
+        message: 'Connection failed: ' + err.message
+      });
+    }
+  }
+
   // GET /api/health-check — data health check
   if (pathname === '/api/health-check' && req.method === 'GET') {
     const items = db.getAllItems();
@@ -984,10 +1186,58 @@ const purgeExpired = () => {
 purgeExpired();
 setInterval(purgeExpired, 24 * 60 * 60 * 1000); // daily
 
+// ==================== Auto Valuation Refresh ====================
+
+async function autoRefreshValuations() {
+  const settings = db.getSettingsInternal();
+  if (!settings.valuationAutoRefresh || !settings.ebayAppId || !settings.ebayCertId) return;
+
+  const staleDays = settings.valuationRefreshDays || 7;
+  const cutoff = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000).toISOString();
+  const staleItems = db.getAllItems()
+    .filter(i => !i.wishlist)
+    .filter(i => !i.valuation || !i.valuation.valuationDate || i.valuation.valuationDate < cutoff);
+
+  if (staleItems.length === 0) return;
+
+  // Process up to 20 items per auto-refresh cycle to avoid hammering the API
+  const batch = staleItems.slice(0, 20);
+  console.log(`  📊 Auto-refreshing valuations for ${batch.length} stale items...`);
+
+  try {
+    const results = await valuation.batchValuate(batch, {
+      appId: settings.ebayAppId,
+      certId: settings.ebayCertId,
+      sandbox: settings.ebaySandbox || false
+    });
+
+    let updated = 0;
+    for (const result of results) {
+      if (result.valuation) {
+        const updates = { valuation: result.valuation };
+        if (result.valuation.found && result.valuation.marketValue) {
+          updates.currentValue = result.valuation.marketValue;
+        }
+        db.updateItem(result.itemId, updates);
+        updated++;
+      }
+    }
+    console.log(`  📊 Auto-refresh complete: ${updated} items updated`);
+  } catch (err) {
+    console.error('  Auto-refresh valuation error:', err.message);
+  }
+}
+
+// Run auto-refresh every 6 hours
+setInterval(autoRefreshValuations, 6 * 60 * 60 * 1000);
+// Also run 30 seconds after startup (give server time to settle)
+setTimeout(autoRefreshValuations, 30000);
+
 server.listen(PORT, () => {
   const settings = db.getSettings();
   console.log(`\n🚂 ${settings.appName}`);
   console.log(`   Server running at http://localhost:${PORT}`);
   console.log(`   Authentication: ${db.hasPassword() ? 'enabled' : 'open (no password set)'}`);
+  console.log(`   Valuation: ${settings.ebayConfigured ? 'eBay API configured' : 'not configured (add eBay API keys in Settings)'}`);
   console.log(`   Press Ctrl+C to stop\n`);
 });

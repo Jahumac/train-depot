@@ -916,8 +916,8 @@ const app = {
           <div class="item-card-manufacturer">${this.esc(item.manufacturer || 'Unknown manufacturer')}</div>
           <div class="item-card-meta">
             <span class="item-card-price">${item.purchasePrice ? this.settings.currency + item.purchasePrice.toFixed(2) : '—'}</span>
-            ${item.currentValue ? `<span class="item-card-value">Val: ${this.settings.currency}${item.currentValue.toFixed(2)}</span>` : ''}
-            ${item.livery ? `<span class="item-card-livery">${this.esc(item.livery)}</span>` : ''}
+            ${this.renderValuationBadge(item)}
+            ${!item.valuation && item.currentValue ? `<span class="item-card-value">Val: ${this.settings.currency}${item.currentValue.toFixed(2)}</span>` : ''}
           </div>
           ${this.daysSinceService(item.lastServiceDate) > (this.settings.serviceIntervalDays || 365) ? '<div class="item-card-service-warn">🔧 Service overdue</div>' : ''}
         </div>
@@ -1016,6 +1016,11 @@ const app = {
                   <span class="detail-field-label">Current Value</span>
                   <span class="detail-field-value ${item.currentValue && item.purchasePrice ? (item.currentValue > item.purchasePrice ? 'value-up' : item.currentValue < item.purchasePrice ? 'value-down' : '') : ''}">${item.currentValue ? this.settings.currency + item.currentValue.toFixed(2) : '—'}</span>
                 </div>
+              </div>
+
+              ${this.renderValuationDetail(item)}
+
+              <div class="detail-fields">
                 <div class="detail-field">
                   <span class="detail-field-label">Manufacturer</span>
                   <span class="detail-field-value">${this.esc(item.manufacturer || '—')}</span>
@@ -1139,6 +1144,46 @@ const app = {
 
           <div id="shareSection"></div>
 
+          <div style="display:grid; gap:24px; margin-bottom:40px;">
+            <div class="backup-panel">
+              <h3>📊 eBay Valuation</h3>
+              <p>Connect your eBay developer account to automatically look up market values for your trains based on real sold prices.</p>
+              <div class="settings-form">
+                <div class="form-group">
+                  <label class="form-label">eBay App ID (Client ID)</label>
+                  <input type="password" class="form-input" id="settingsEbayAppId" placeholder="${s.ebayAppIdMasked || 'Enter your eBay App ID...'}" autocomplete="off">
+                  ${s.ebayConfigured ? '<span style="color:var(--color-success);font-size:0.8rem;">✓ Configured</span>' : '<span style="color:var(--color-text-muted);font-size:0.8rem;">Not configured</span>'}
+                </div>
+                <div class="form-group">
+                  <label class="form-label">eBay Cert ID (Client Secret)</label>
+                  <input type="password" class="form-input" id="settingsEbayCertId" placeholder="${s.ebayCertIdMasked || 'Enter your eBay Cert ID...'}" autocomplete="off">
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label" style="display:flex;align-items:center;gap:8px;">
+                      <input type="checkbox" id="settingsValuationAuto" ${s.valuationAutoRefresh ? 'checked' : ''}>
+                      Auto-refresh valuations
+                    </label>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Refresh every (days)</label>
+                    <input type="number" class="form-input" id="settingsValuationDays" value="${s.valuationRefreshDays || 7}" min="1" max="90" style="width:80px">
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="btn btn-primary" onclick="app.saveEbaySettings()">💾 Save eBay Settings</button>
+                  <button class="btn btn-outline" onclick="app.testEbayConnection()">🔌 Test Connection</button>
+                  ${s.ebayConfigured ? '<button class="btn btn-outline" onclick="app.refreshAllValuations()">🔄 Refresh All Values</button>' : ''}
+                </div>
+                <div id="ebayTestResult" style="margin-top:8px;"></div>
+                <p style="font-size:0.8rem;color:var(--color-text-muted);margin-top:12px;">
+                  Get free eBay API credentials at <a href="https://developer.ebay.com/" target="_blank" rel="noopener" style="color:var(--color-accent);">developer.ebay.com</a> —
+                  create an application and copy your Production App ID and Cert ID.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <h2>Collection Tools</h2>
           <div style="display:grid; gap:16px; margin-bottom:40px;">
             <div class="backup-panel">
@@ -1224,6 +1269,192 @@ const app = {
       this.applyAppName();
       this.toast('Settings saved \u2014 running like clockwork!');
     } catch(e) { /* toast shown */ }
+  },
+
+  // ==================== eBay Valuation ====================
+
+  async saveEbaySettings() {
+    const appId = document.getElementById('settingsEbayAppId').value.trim();
+    const certId = document.getElementById('settingsEbayCertId').value.trim();
+    const autoRefresh = document.getElementById('settingsValuationAuto').checked;
+    const refreshDays = parseInt(document.getElementById('settingsValuationDays').value) || 7;
+
+    const payload = { valuationAutoRefresh: autoRefresh, valuationRefreshDays: refreshDays };
+    // Only send credentials if user actually typed new ones (not just the placeholder)
+    if (appId) payload.ebayAppId = appId;
+    if (certId) payload.ebayCertId = certId;
+
+    try {
+      await this.api('/api/settings/ebay', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      // Refresh settings
+      this.settings = await this.api('/api/settings');
+      this.toast('eBay settings saved!');
+      this.showBackup(); // re-render to show updated state
+    } catch(e) { /* toast shown by api() */ }
+  },
+
+  async testEbayConnection() {
+    const resultEl = document.getElementById('ebayTestResult');
+    resultEl.innerHTML = '<span style="color:var(--color-text-muted);">Testing connection...</span>';
+
+    try {
+      const result = await this.api('/api/settings/ebay/test', { method: 'POST' });
+      if (result.success) {
+        resultEl.innerHTML = `<span style="color:var(--color-success);">✓ ${this.esc(result.message)}</span>`;
+      } else {
+        resultEl.innerHTML = `<span style="color:var(--color-danger);">✗ ${this.esc(result.message)}</span>`;
+      }
+    } catch(e) {
+      resultEl.innerHTML = `<span style="color:var(--color-danger);">✗ Connection test failed</span>`;
+    }
+  },
+
+  async valuateItem(itemId) {
+    this.toast('Checking eBay prices...', 'info');
+    try {
+      const result = await this.api(`/api/items/${itemId}/valuate`, { method: 'POST' });
+      if (result.valuation && result.valuation.found) {
+        this.toast(`Found ${result.valuation.listingsAnalysed} listings — market value: ${this.settings.currency}${result.valuation.marketValue.toFixed(2)}`);
+      } else {
+        this.toast('No matching listings found on eBay. Try adding a product code for better results.', 'warning');
+      }
+      // Refresh the detail view if we're on it
+      if (this.currentView === 'detail' && this.detailItem && this.detailItem.id === itemId) {
+        this.detailItem = result.item;
+        document.getElementById('mainContent').innerHTML = this.renderDetail();
+      }
+      // Refresh items list
+      await this.loadItems();
+    } catch(e) { /* toast shown by api() */ }
+  },
+
+  async refreshAllValuations() {
+    this.toast('Refreshing all valuations — this may take a minute...', 'info');
+    try {
+      const result = await this.api('/api/valuations/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staleOnly: false })
+      });
+      this.toast(`${result.message}${result.remaining > 0 ? ` (${result.remaining} remaining — run again to continue)` : ''}`);
+      await this.loadItems();
+    } catch(e) { /* toast shown */ }
+  },
+
+  renderValuationBadge(item) {
+    if (!item.valuation || !item.valuation.found || !item.valuation.marketValue) return '';
+    const market = item.valuation.marketValue;
+    const paid = item.purchasePrice || 0;
+    if (!paid) return `<span class="valuation-badge valuation-neutral" title="Market value">≈ ${this.settings.currency}${market.toFixed(0)}</span>`;
+    const diff = market - paid;
+    const pct = Math.round((diff / paid) * 100);
+    if (Math.abs(diff) < 1) return `<span class="valuation-badge valuation-neutral" title="Market value matches purchase price">≈ Fair price</span>`;
+    if (diff > 0) {
+      return `<span class="valuation-badge valuation-up" title="Worth ${this.settings.currency}${diff.toFixed(2)} more than you paid (${pct}%)">↑ +${this.settings.currency}${diff.toFixed(0)} (${pct}%)</span>`;
+    } else {
+      return `<span class="valuation-badge valuation-down" title="Worth ${this.settings.currency}${Math.abs(diff).toFixed(2)} less than you paid (${pct}%)">↓ -${this.settings.currency}${Math.abs(diff).toFixed(0)} (${pct}%)</span>`;
+    }
+  },
+
+  renderValuationDetail(item) {
+    if (!item.valuation) {
+      return `
+        <div class="valuation-panel">
+          <div class="valuation-panel-header">
+            <span>📊 Market Valuation</span>
+            <button class="btn btn-outline btn-sm" onclick="app.valuateItem('${item.id}')">Check eBay Value</button>
+          </div>
+          <p style="color:var(--color-text-muted);font-size:0.9rem;">No valuation data yet. Click "Check eBay Value" to look up current market prices.</p>
+        </div>
+      `;
+    }
+
+    const v = item.valuation;
+    const age = v.valuationDate ? this.timeAgo(v.valuationDate) : 'unknown';
+
+    if (!v.found) {
+      return `
+        <div class="valuation-panel">
+          <div class="valuation-panel-header">
+            <span>📊 Market Valuation</span>
+            <button class="btn btn-outline btn-sm" onclick="app.valuateItem('${item.id}')">🔄 Retry</button>
+          </div>
+          <p style="color:var(--color-text-muted);font-size:0.9rem;">${this.esc(v.message || v.error || 'No listings found')} — checked ${age}</p>
+        </div>
+      `;
+    }
+
+    const paid = item.purchasePrice || 0;
+    const market = v.marketValue || 0;
+    const diff = market - paid;
+    const diffClass = diff > 0 ? 'valuation-up' : diff < 0 ? 'valuation-down' : 'valuation-neutral';
+
+    return `
+      <div class="valuation-panel">
+        <div class="valuation-panel-header">
+          <span>📊 Market Valuation</span>
+          <button class="btn btn-outline btn-sm" onclick="app.valuateItem('${item.id}')">🔄 Refresh</button>
+        </div>
+        <div class="valuation-stats">
+          <div class="valuation-stat">
+            <span class="valuation-stat-label">Market Value</span>
+            <span class="valuation-stat-value">${this.settings.currency}${market.toFixed(2)}</span>
+          </div>
+          ${paid > 0 ? `
+          <div class="valuation-stat">
+            <span class="valuation-stat-label">You Paid</span>
+            <span class="valuation-stat-value">${this.settings.currency}${paid.toFixed(2)}</span>
+          </div>
+          <div class="valuation-stat">
+            <span class="valuation-stat-label">${diff >= 0 ? 'Gain' : 'Loss'}</span>
+            <span class="valuation-stat-value ${diffClass}">${diff >= 0 ? '+' : ''}${this.settings.currency}${diff.toFixed(2)}</span>
+          </div>
+          ` : ''}
+        </div>
+        ${v.priceRange ? `
+        <div style="font-size:0.85rem;color:var(--color-text-muted);margin-top:8px;">
+          Range: ${this.settings.currency}${v.priceRange.low.toFixed(2)} – ${this.settings.currency}${v.priceRange.high.toFixed(2)}
+          &nbsp;|&nbsp; ${v.listingsAnalysed} listing${v.listingsAnalysed !== 1 ? 's' : ''} analysed
+          &nbsp;|&nbsp; Confidence: <strong>${v.confidence}</strong>
+        </div>
+        ` : ''}
+        ${v.conditionAdjustment ? `<div style="font-size:0.8rem;color:var(--color-text-muted);margin-top:4px;">${this.esc(v.conditionAdjustment)}</div>` : ''}
+        <div style="font-size:0.75rem;color:var(--color-text-muted);margin-top:8px;">Last checked: ${age}</div>
+        ${v.listings && v.listings.length > 0 ? `
+        <details style="margin-top:12px;">
+          <summary style="cursor:pointer;font-size:0.85rem;color:var(--color-accent);font-weight:600;">View eBay Listings</summary>
+          <div class="valuation-listings">
+            ${v.listings.map(l => `
+              <div class="valuation-listing">
+                <div class="valuation-listing-title">${this.esc(l.title)}</div>
+                <div class="valuation-listing-price">${this.settings.currency}${l.price.toFixed(2)}</div>
+                ${l.url ? `<a href="${l.url}" target="_blank" rel="noopener" class="valuation-listing-link">View on eBay →</a>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </details>
+        ` : ''}
+      </div>
+    `;
+  },
+
+  timeAgo(dateStr) {
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    const diff = now - then;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return days + 'd ago';
+    const weeks = Math.floor(days / 7);
+    return weeks + 'w ago';
   },
 
   async changePassword() {
@@ -1866,6 +2097,19 @@ const app = {
       .sort((a, b) => b.currentValue - a.currentValue)
       .slice(0, 5);
 
+    // eBay valuation stats
+    const valuedItems = items.filter(i => i.valuation && i.valuation.found);
+    const totalMarketValue = valuedItems.reduce((sum, i) => sum + (i.valuation.marketValue || 0), 0);
+    const marketGain = totalMarketValue - totalSpent;
+    const marketGainPct = totalSpent > 0 ? ((marketGain / totalSpent) * 100).toFixed(1) : 0;
+
+    // Best deals (items where market value exceeds purchase price most)
+    const bestDeals = items
+      .filter(i => i.valuation && i.valuation.found && i.purchasePrice > 0)
+      .map(i => ({ ...i, dealGain: i.valuation.marketValue - i.purchasePrice, dealPct: ((i.valuation.marketValue - i.purchasePrice) / i.purchasePrice * 100) }))
+      .sort((a, b) => b.dealPct - a.dealPct)
+      .slice(0, 5);
+
     return `
       <div class="dashboard-container">
         <h1 style="margin-bottom: 30px;">Collection Dashboard</h1>
@@ -1906,6 +2150,48 @@ const app = {
             <div class="dashboard-card-value">${stats.wishlistCount}</div>
           </div>
         </div>
+
+        ${valuedItems.length > 0 ? `
+        <div style="margin-top:24px;margin-bottom:24px;">
+          <div class="dashboard-chart-container">
+            <div class="dashboard-chart-title" style="display:flex;justify-content:space-between;align-items:center;">
+              <span>📊 eBay Market Valuation</span>
+              ${this.settings.ebayConfigured ? `<button class="btn btn-outline btn-sm" onclick="app.refreshAllValuations()">🔄 Refresh All</button>` : ''}
+            </div>
+            <div class="dashboard-grid" style="margin-top:12px;">
+              <div class="dashboard-card">
+                <div class="dashboard-card-title">Market Value</div>
+                <div class="dashboard-card-value">${this.settings.currency}${totalMarketValue.toFixed(2)}</div>
+                <div class="dashboard-card-change ${marketGain >= 0 ? 'positive' : 'negative'}">
+                  ${marketGain >= 0 ? '↑' : '↓'} ${this.settings.currency}${Math.abs(marketGain).toFixed(2)} (${marketGainPct}%)
+                </div>
+              </div>
+              <div class="dashboard-card">
+                <div class="dashboard-card-title">Items Valued</div>
+                <div class="dashboard-card-value">${valuedItems.length} / ${items.length}</div>
+              </div>
+            </div>
+            ${bestDeals.length > 0 ? `
+            <div style="margin-top:16px;">
+              <div class="dashboard-list-title" style="font-size:0.95rem;">Best Deals</div>
+              ${bestDeals.map(d => `
+                <div class="dashboard-list-item" onclick="app.showDetail('${d.id}')" style="cursor:pointer;">
+                  <div class="dashboard-list-name">${this.esc(d.name)}</div>
+                  <div style="display:flex;gap:8px;align-items:center;">
+                    <span class="valuation-badge ${d.dealGain >= 0 ? 'valuation-up' : 'valuation-down'}">${d.dealGain >= 0 ? '+' : ''}${this.settings.currency}${d.dealGain.toFixed(0)} (${d.dealPct.toFixed(0)}%)</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            ` : ''}
+          </div>
+        </div>
+        ` : (this.settings.ebayConfigured ? `
+        <div style="margin:24px 0;padding:16px;background:var(--color-surface);border-radius:var(--radius-md,8px);border:1px solid var(--color-border);text-align:center;">
+          <p style="margin-bottom:12px;">📊 eBay API is connected but no items have been valued yet.</p>
+          <button class="btn btn-primary" onclick="app.refreshAllValuations()">🔄 Value Entire Collection</button>
+        </div>
+        ` : '')}
 
         <div class="dashboard-chart-container">
           <div class="dashboard-chart-title">Items Added Over Time</div>

@@ -49,7 +49,13 @@ const DEFAULT_SETTINGS = {
   serviceIntervalDays: 365,
   passwordHash: '',
   passwordSalt: '',
-  shareToken: ''
+  shareToken: '',
+  // eBay Valuation settings
+  ebayAppId: '',
+  ebayCertId: '',
+  ebaySandbox: false,
+  valuationAutoRefresh: true,
+  valuationRefreshDays: 7
 };
 
 // --- In-memory cache ---
@@ -68,7 +74,7 @@ function ensureDbExists() {
       metadata: {
         created: new Date().toISOString(),
         lastModified: new Date().toISOString(),
-        version: '1.3.0'
+        version: '1.4.0'
       }
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(defaultDb, null, 2));
@@ -192,6 +198,8 @@ function createItem(itemData) {
     storageLocation: itemData.storageLocation || '',
     serviceLog: itemData.serviceLog || [],
     tags: itemData.tags || [],
+    // Valuation data
+    valuation: itemData.valuation || null,
     deleted: false,
     deletedAt: null,
     createdAt: now,
@@ -213,7 +221,7 @@ function updateItem(id, updates) {
     'categoryId', 'subcategoryId', 'images', 'wishlist',
     'wishlistNotes', 'wishlistSpottedPrice', 'wishlistSpottedAt',
     'runningNumber', 'productCode', 'condition', 'dccStatus', 'purchaseDate',
-    'storageLocation', 'serviceLog', 'tags'];
+    'storageLocation', 'serviceLog', 'tags', 'valuation'];
 
   for (const key of allowed) {
     if (updates[key] !== undefined) {
@@ -223,6 +231,8 @@ function updateItem(id, updates) {
         db.items[idx][key] = !!updates[key];
       } else if (key === 'serviceLog' || key === 'tags') {
         db.items[idx][key] = Array.isArray(updates[key]) ? updates[key] : [];
+      } else if (key === 'valuation') {
+        db.items[idx][key] = updates[key] && typeof updates[key] === 'object' ? updates[key] : null;
       } else {
         db.items[idx][key] = updates[key];
       }
@@ -464,8 +474,16 @@ function getStats() {
 function getSettings() {
   const db = readDb();
   const settings = { ...DEFAULT_SETTINGS, ...(db.settings || {}) };
-  // Never expose password hash/salt to the client via normal settings endpoint
+  // Never expose password hash/salt or full eBay credentials to the client
   const { passwordHash, passwordSalt, ...safeSettings } = settings;
+  // Mask eBay credentials (show only last 4 chars for confirmation)
+  if (safeSettings.ebayAppId) {
+    safeSettings.ebayAppIdMasked = '••••' + safeSettings.ebayAppId.slice(-4);
+  }
+  if (safeSettings.ebayCertId) {
+    safeSettings.ebayCertIdMasked = '••••' + safeSettings.ebayCertId.slice(-4);
+  }
+  safeSettings.ebayConfigured = !!(safeSettings.ebayAppId && safeSettings.ebayCertId);
   return safeSettings;
 }
 
@@ -504,7 +522,8 @@ function getSettingsInternal() {
 function updateSettings(updates) {
   const db = readDb();
   if (!db.settings) db.settings = { ...DEFAULT_SETTINGS };
-  const allowed = ['appName', 'tagline', 'currency', 'serviceIntervalDays', 'shareToken'];
+  const allowed = ['appName', 'tagline', 'currency', 'serviceIntervalDays', 'shareToken',
+    'ebayAppId', 'ebayCertId', 'ebaySandbox', 'valuationAutoRefresh', 'valuationRefreshDays'];
   for (const key of allowed) {
     if (updates[key] !== undefined) {
       db.settings[key] = updates[key];
