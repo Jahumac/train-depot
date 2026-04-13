@@ -67,7 +67,7 @@ function ensureDbExists() {
       metadata: {
         created: new Date().toISOString(),
         lastModified: new Date().toISOString(),
-        version: '1.0.0'
+        version: '1.1.0'
       }
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(defaultDb, null, 2));

@@ -732,6 +732,7 @@ const app = {
           </div>
           <h1 class="hero-title">${this.esc(this.settings.appName)}</h1>
           <p class="hero-subtitle">${this.esc(this.settings.tagline)}</p>
+          <p class="hero-greeting">${this.getGreeting()}</p>
           <div class="hero-actions">
             <button class="btn btn-primary" onclick="app.showCatalog()">📖 Browse Collection</button>
             <button class="btn btn-secondary" onclick="app.openAddModal()">➕ Add New Item</button>
@@ -877,16 +878,25 @@ const app = {
   },
 
   renderEmpty() {
+    const searchTips = [
+      'Hmm, nothing on this line \u2014 try adjusting your search terms!',
+      'No trains at this platform. Try a different search?',
+      'The signal\u2019s at red \u2014 no results found. Try different words!'
+    ];
+    const emptyTips = [
+      'The engine shed\u2019s looking a bit empty! Time to bring in some stock.',
+      'No locos on shed yet \u2014 every great collection starts with one.',
+      'A quiet day at the depot. Why not add your first model?'
+    ];
+    const tips = this.currentFilter?.type === 'search' ? searchTips : emptyTips;
+    const tip = tips[Math.floor(Math.random() * tips.length)];
+
     return `
       <div class="empty-state">
-        <span class="empty-icon">🔍</span>
-        <div class="empty-title">No items found</div>
-        <div class="empty-text">
-          ${this.currentFilter?.type === 'search'
-            ? 'Try adjusting your search terms'
-            : 'Start building your collection by adding your first item'}
-        </div>
-        <button class="btn btn-primary" onclick="app.openAddModal()">➕ Add First Item</button>
+        <div class="empty-mascot">${this.mascotMedium()}</div>
+        <div class="empty-title">${this.currentFilter?.type === 'search' ? 'End of the line!' : 'All quiet on shed'}</div>
+        <div class="empty-text">${tip}</div>
+        ${this.currentFilter?.type !== 'search' ? '<button class="btn btn-primary" onclick="app.openAddModal()">➕ Add First Item</button>' : ''}
       </div>
     `;
   },
@@ -1089,7 +1099,7 @@ const app = {
         body: JSON.stringify({ appName, tagline, currency, serviceIntervalDays })
       });
       this.applyAppName();
-      this.toast('Settings saved!');
+      this.toast('Settings saved \u2014 running like clockwork!');
     } catch(e) { /* toast shown */ }
   },
 
@@ -1114,8 +1124,14 @@ const app = {
   },
 
   async removePasswordUI() {
-    const currentPass = prompt('Enter your current password to confirm removal:');
-    if (currentPass === null) return;
+    const currentPass = await this.showInputModal({
+      title: 'Remove Password',
+      label: 'Current Password',
+      placeholder: 'Enter your current password to confirm',
+      icon: '🔓',
+      hint: 'This will make the app open to everyone on your network.'
+    });
+    if (!currentPass) return;
     try {
       await this.api('/api/auth/remove-password', {
         method: 'POST',
@@ -1331,14 +1347,14 @@ const app = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(itemData)
         });
-        this.toast('Item updated successfully!');
+        this.toast('All polished up \u2014 item updated!');
       } else {
         await this.api('/api/items', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(itemData)
         });
-        this.toast('Item added to collection!');
+        this.toast('Welcome to the shed \u2014 new item added!');
       }
 
       this.closeModal();
@@ -1355,31 +1371,22 @@ const app = {
 
   // ==================== Delete ====================
 
-  confirmDelete(id) {
-    const overlay = document.createElement('div');
-    overlay.className = 'confirm-overlay';
-    overlay.innerHTML = `
-      <div class="confirm-box">
-        <h3>Delete Item?</h3>
-        <p>This action cannot be undone. The item will be permanently removed from your collection.</p>
-        <div class="confirm-actions">
-          <button class="btn btn-outline" data-action="cancel">Cancel</button>
-          <button class="btn btn-danger" data-action="delete">Delete</button>
-        </div>
-      </div>
-    `;
-    overlay.querySelector('[data-action="cancel"]').onclick = () => overlay.remove();
-    overlay.querySelector('[data-action="delete"]').onclick = () => {
-      this.deleteItem(id);
-      overlay.remove();
-    };
-    document.body.appendChild(overlay);
+  async confirmDelete(id) {
+    const item = this.detailItem || this.items.find(i => i.id === id);
+    const name = item ? item.name : 'this item';
+    const ok = await this.showConfirmModal({
+      title: 'Send to the scrapyard?',
+      message: `<strong>${this.esc(name)}</strong> will be permanently removed from your collection. This can\u2019t be undone!`,
+      confirmText: 'Scrap it',
+      icon: '🗑️'
+    });
+    if (ok) this.deleteItem(id);
   },
 
   async deleteItem(id) {
     try {
       await this.api(`/api/items/${id}`, { method: 'DELETE' });
-      this.toast('Item deleted');
+      this.toast('Off to the scrapyard \u2014 item removed.');
       await this.loadAllItems();
       await this.loadStats();
       this.showCatalog(this.currentFilter);
@@ -1425,7 +1432,7 @@ const app = {
         headers: { 'Content-Type': 'application/json' },
         body: text
       });
-      this.toast('Data restored successfully!');
+      this.toast('All aboard \u2014 data restored successfully!');
       await this.loadCategories();
       await this.loadAllItems();
       await this.loadStats();
@@ -1509,18 +1516,108 @@ const app = {
     event.target.value = '';
   },
 
+  // ==================== Styled Modal Dialogs ====================
+
+  /**
+   * Show a styled input modal (replaces browser prompt())
+   * Returns a Promise that resolves with the input value or null if cancelled
+   */
+  showInputModal({ title, label, placeholder, value, icon, hint }) {
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'confirm-overlay';
+      overlay.innerHTML = `
+        <div class="depot-dialog">
+          <div class="depot-dialog-header">
+            <div class="depot-dialog-mascot">${this.mascotSmall()}</div>
+            <div>
+              <h3 class="depot-dialog-title">${title || 'Input'}</h3>
+              ${hint ? `<p class="depot-dialog-hint">${hint}</p>` : ''}
+            </div>
+          </div>
+          <div class="depot-dialog-body">
+            <label class="form-label">${label || 'Name'}</label>
+            <input type="text" class="form-input depot-dialog-input" placeholder="${this.esc(placeholder || '')}" value="${this.esc(value || '')}" autofocus>
+          </div>
+          <div class="depot-dialog-actions">
+            <button class="btn btn-outline" data-action="cancel">Cancel</button>
+            <button class="btn btn-primary" data-action="confirm">${icon || '✅'} Confirm</button>
+          </div>
+        </div>
+      `;
+
+      const input = overlay.querySelector('.depot-dialog-input');
+      const confirm = () => {
+        const val = input.value.trim();
+        overlay.remove();
+        resolve(val || null);
+      };
+      const cancel = () => { overlay.remove(); resolve(null); };
+
+      overlay.querySelector('[data-action="cancel"]').onclick = cancel;
+      overlay.querySelector('[data-action="confirm"]').onclick = confirm;
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') confirm();
+        if (e.key === 'Escape') cancel();
+      });
+      overlay.addEventListener('click', e => { if (e.target === overlay) cancel(); });
+
+      document.body.appendChild(overlay);
+      setTimeout(() => input.focus(), 50);
+    });
+  },
+
+  /**
+   * Show a styled confirm modal (replaces browser confirm())
+   * Returns a Promise that resolves with true/false
+   */
+  showConfirmModal({ title, message, confirmText, confirmClass, icon }) {
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'confirm-overlay';
+      overlay.innerHTML = `
+        <div class="depot-dialog">
+          <div class="depot-dialog-header">
+            <div class="depot-dialog-mascot">${this.mascotSmall('worried')}</div>
+            <div>
+              <h3 class="depot-dialog-title">${title || 'Are you sure?'}</h3>
+            </div>
+          </div>
+          <div class="depot-dialog-body">
+            <p class="depot-dialog-message">${message}</p>
+          </div>
+          <div class="depot-dialog-actions">
+            <button class="btn btn-outline" data-action="cancel">Keep it</button>
+            <button class="btn ${confirmClass || 'btn-danger'}" data-action="confirm">${icon || '🗑️'} ${confirmText || 'Delete'}</button>
+          </div>
+        </div>
+      `;
+
+      overlay.querySelector('[data-action="cancel"]').onclick = () => { overlay.remove(); resolve(false); };
+      overlay.querySelector('[data-action="confirm"]').onclick = () => { overlay.remove(); resolve(true); };
+      overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+      document.body.appendChild(overlay);
+    });
+  },
+
   // ==================== Category Management ====================
 
   async addCategory() {
-    const name = prompt('Enter new category name:');
-    if (!name || !name.trim()) return;
+    const name = await this.showInputModal({
+      title: 'New Category',
+      label: 'Category Name',
+      placeholder: 'e.g., Scenery, Track & Accessories...',
+      icon: '📁',
+      hint: 'Right then, let\u2019s get things organised!'
+    });
+    if (!name) return;
     try {
       await this.api('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() })
+        body: JSON.stringify({ name })
       });
-      this.toast('Category added!');
+      this.toast('New siding opened! Category added.');
       await this.loadCategories();
       await this.loadStats();
       this.render();
@@ -1529,25 +1626,38 @@ const app = {
 
   async renameCategory(id) {
     const cat = this.categories.find(c => c.id === id);
-    const name = prompt('Rename category:', cat ? cat.name : '');
-    if (!name || !name.trim()) return;
+    const name = await this.showInputModal({
+      title: 'Rename Category',
+      label: 'New Name',
+      value: cat ? cat.name : '',
+      icon: '✏️',
+      hint: 'A fresh name for this part of the shed.'
+    });
+    if (!name) return;
     try {
       await this.api(`/api/categories/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() })
+        body: JSON.stringify({ name })
       });
-      this.toast('Category renamed!');
+      this.toast('Category renamed \u2014 looking smart!');
       await this.loadCategories();
       this.render();
     } catch(e) { /* toast shown */ }
   },
 
   async removeCategoryConfirm(id) {
-    if (!confirm('Delete this category? This cannot be undone.')) return;
+    const cat = this.categories.find(c => c.id === id);
+    const ok = await this.showConfirmModal({
+      title: 'Delete Category?',
+      message: `Are you sure you want to remove <strong>${this.esc(cat?.name || 'this category')}</strong>? This can\u2019t be undone. Make sure no items are parked here first!`,
+      confirmText: 'Remove',
+      icon: '🗑️'
+    });
+    if (!ok) return;
     try {
       await this.api(`/api/categories/${id}`, { method: 'DELETE' });
-      this.toast('Category deleted');
+      this.toast('Category removed from the timetable.');
       await this.loadCategories();
       await this.loadStats();
       this.showCatalog();
@@ -1555,15 +1665,22 @@ const app = {
   },
 
   async addSubcategory(categoryId) {
-    const name = prompt('Enter new subcategory name:');
-    if (!name || !name.trim()) return;
+    const cat = this.categories.find(c => c.id === categoryId);
+    const name = await this.showInputModal({
+      title: 'New Subcategory',
+      label: 'Subcategory Name',
+      placeholder: 'e.g., Tank Engines, Pullman Coaches...',
+      icon: '📂',
+      hint: cat ? `Adding to ${cat.name} \u2014 lovely stuff!` : 'A new berth awaits.'
+    });
+    if (!name) return;
     try {
       await this.api(`/api/categories/${categoryId}/subcategories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() })
+        body: JSON.stringify({ name })
       });
-      this.toast('Subcategory added!');
+      this.toast('Subcategory coupled up nicely!');
       await this.loadCategories();
       await this.loadStats();
       this.render();
@@ -1573,25 +1690,39 @@ const app = {
   async renameSubcategory(categoryId, subcategoryId) {
     const cat = this.categories.find(c => c.id === categoryId);
     const sub = cat ? cat.subcategories.find(s => s.id === subcategoryId) : null;
-    const name = prompt('Rename subcategory:', sub ? sub.name : '');
-    if (!name || !name.trim()) return;
+    const name = await this.showInputModal({
+      title: 'Rename Subcategory',
+      label: 'New Name',
+      value: sub ? sub.name : '',
+      icon: '✏️',
+      hint: 'A little touch-up for the nameplate.'
+    });
+    if (!name) return;
     try {
       await this.api(`/api/categories/${categoryId}/subcategories/${subcategoryId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() })
+        body: JSON.stringify({ name })
       });
-      this.toast('Subcategory renamed!');
+      this.toast('Subcategory renamed \u2014 that\u2019s the ticket!');
       await this.loadCategories();
       this.render();
     } catch(e) { /* toast shown */ }
   },
 
   async removeSubcategoryConfirm(categoryId, subcategoryId) {
-    if (!confirm('Delete this subcategory? This cannot be undone.')) return;
+    const cat = this.categories.find(c => c.id === categoryId);
+    const sub = cat ? cat.subcategories.find(s => s.id === subcategoryId) : null;
+    const ok = await this.showConfirmModal({
+      title: 'Delete Subcategory?',
+      message: `Remove <strong>${this.esc(sub?.name || 'this subcategory')}</strong> from ${this.esc(cat?.name || 'the roster')}? Make sure no items are using it first!`,
+      confirmText: 'Remove',
+      icon: '🗑️'
+    });
+    if (!ok) return;
     try {
       await this.api(`/api/categories/${categoryId}/subcategories/${subcategoryId}`, { method: 'DELETE' });
-      this.toast('Subcategory deleted');
+      this.toast('Subcategory uncoupled and removed.');
       await this.loadCategories();
       await this.loadStats();
       this.showCatalog();
@@ -1708,9 +1839,121 @@ const app = {
     const container = document.getElementById('toastContainer');
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.innerHTML = `<span>${type === 'error' ? '⚠️' : '✅'}</span> ${this.esc(message)}`;
+    const icon = type === 'error' ? this.mascotTiny('worried') : this.mascotTiny('happy');
+    toast.innerHTML = `<span class="toast-mascot">${icon}</span> ${this.esc(message)}`;
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
+  },
+
+  // ==================== Greetings & Personality ====================
+
+  getGreeting() {
+    const hour = new Date().getHours();
+    const count = this.stats?.totalItems || 0;
+    if (hour < 6) return 'Burning the midnight oil? The depot never sleeps!';
+    if (hour < 12) {
+      const m = ['Good morning! The shed doors are open.', 'Morning! Time for a cuppa and some cataloguing.', 'Rise and shine \u2014 your collection awaits!'];
+      return m[Math.floor(Math.random() * m.length)];
+    }
+    if (hour < 18) {
+      if (count === 0) return 'The shed\u2019s quiet \u2014 why not add your first model?';
+      const a = ['Good afternoon! Fancy adding to the collection?', `${count} items in the shed and counting!`, 'Afternoon! Everything shipshape on the layout?'];
+      return a[Math.floor(Math.random() * a.length)];
+    }
+    const e = ['Evening! Perfect time to browse the collection.', 'Good evening \u2014 the depot lights are on.', 'Evening! Time to wind down with some trains.'];
+    return e[Math.floor(Math.random() * e.length)];
+  },
+
+  // ==================== Mascot (Smokey the Depot Engine) ====================
+
+  /**
+   * SVG mascot — a friendly little tank engine face.
+   * Moods: 'happy' (default), 'worried', 'thinking'
+   * Used in dialogs, empty states, and toasts for personality.
+   */
+  mascotTiny(mood = 'happy') {
+    const eyeL = mood === 'worried' ? 'cy="10"' : 'cy="11"';
+    const eyeR = mood === 'worried' ? 'cy="10"' : 'cy="11"';
+    const mouth = mood === 'happy'
+      ? '<path d="M11 17 Q14 20 17 17" stroke="#333" stroke-width="1.2" fill="none" stroke-linecap="round"/>'
+      : mood === 'worried'
+        ? '<path d="M11 19 Q14 17 17 19" stroke="#333" stroke-width="1.2" fill="none" stroke-linecap="round"/>'
+        : '<line x1="11" y1="18" x2="17" y2="18" stroke="#333" stroke-width="1.2" stroke-linecap="round"/>';
+    return `<svg viewBox="0 0 28 28" width="22" height="22" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="4" width="24" height="18" rx="6" fill="#2d6a4f"/>
+      <rect x="2" y="4" width="24" height="5" rx="3" fill="#c9a227"/>
+      <circle cx="10" ${eyeL} r="2.5" fill="white"/><circle cx="10.3" ${eyeL} r="1.2" fill="#333"/>
+      <circle cx="18" ${eyeR} r="2.5" fill="white"/><circle cx="18.3" ${eyeR} r="1.2" fill="#333"/>
+      ${mouth}
+      <rect x="11" y="1" width="6" height="4" rx="2" fill="#1b4332"/>
+      <circle cx="7" cy="24" r="3" fill="#444" stroke="#555" stroke-width="0.8"/><circle cx="7" cy="24" r="1" fill="#c9a227"/>
+      <circle cx="21" cy="24" r="3" fill="#444" stroke="#555" stroke-width="0.8"/><circle cx="21" cy="24" r="1" fill="#c9a227"/>
+    </svg>`;
+  },
+
+  mascotSmall(mood = 'happy') {
+    const eyeL = mood === 'worried' ? 'cy="30"' : 'cy="32"';
+    const eyeR = mood === 'worried' ? 'cy="30"' : 'cy="32"';
+    const brow = mood === 'worried'
+      ? '<line x1="20" y1="23" x2="27" y2="25" stroke="#1b4332" stroke-width="2" stroke-linecap="round"/><line x1="48" y1="25" x2="55" y2="23" stroke="#1b4332" stroke-width="2" stroke-linecap="round"/>'
+      : '';
+    const mouth = mood === 'happy'
+      ? '<path d="M28 44 Q37 52 46 44" stroke="#333" stroke-width="2" fill="none" stroke-linecap="round"/>'
+      : mood === 'worried'
+        ? '<path d="M30 48 Q37 43 44 48" stroke="#333" stroke-width="2" fill="none" stroke-linecap="round"/>'
+        : '<line x1="30" y1="46" x2="44" y2="46" stroke="#333" stroke-width="2" stroke-linecap="round"/>';
+    const cheeks = mood === 'happy' ? '<circle cx="19" cy="39" r="4" fill="#e8886880"/><circle cx="55" cy="39" r="4" fill="#e8886880"/>' : '';
+    return `<svg viewBox="0 0 74 66" width="52" height="46" xmlns="http://www.w3.org/2000/svg">
+      <rect x="6" y="12" width="62" height="40" rx="12" fill="#2d6a4f"/>
+      <rect x="6" y="10" width="62" height="10" rx="5" fill="#c9a227"/>
+      ${brow}
+      <circle cx="27" ${eyeL} r="6" fill="white"/><circle cx="28" ${eyeL} r="3" fill="#333"/>
+      <circle cx="47" ${eyeR} r="6" fill="white"/><circle cx="48" ${eyeR} r="3" fill="#333"/>
+      ${cheeks}
+      ${mouth}
+      <rect x="29" y="2" width="16" height="10" rx="4" fill="#1b4332"/>
+      <rect x="26" y="0" width="22" height="5" rx="3" fill="#0f2b1f"/>
+      <circle cx="18" cy="58" r="6" fill="#444" stroke="#555" stroke-width="1.5"/><circle cx="18" cy="58" r="2" fill="#c9a227"/>
+      <circle cx="56" cy="58" r="6" fill="#444" stroke="#555" stroke-width="1.5"/><circle cx="56" cy="58" r="2" fill="#c9a227"/>
+      <circle cx="37" cy="58" r="5" fill="#444" stroke="#555" stroke-width="1.5"/><circle cx="37" cy="58" r="1.5" fill="#c9a227"/>
+    </svg>`;
+  },
+
+  mascotMedium(mood = 'happy') {
+    const mouth = mood === 'happy'
+      ? '<path d="M42 68 Q56 80 70 68" stroke="#333" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+      : '<path d="M44 74 Q56 66 68 74" stroke="#333" stroke-width="2.5" fill="none" stroke-linecap="round"/>';
+    return `<svg viewBox="0 0 112 100" width="100" height="90" xmlns="http://www.w3.org/2000/svg">
+      <!-- Body -->
+      <rect x="10" y="20" width="92" height="58" rx="16" fill="#2d6a4f"/>
+      <!-- Gold stripe -->
+      <rect x="10" y="16" width="92" height="14" rx="7" fill="#c9a227"/>
+      <!-- Chimney -->
+      <rect x="44" y="2" width="24" height="16" rx="6" fill="#1b4332"/>
+      <rect x="40" y="0" width="32" height="7" rx="4" fill="#0f2b1f"/>
+      <!-- Steam puffs -->
+      <g opacity="0.3" fill="white">
+        <circle cx="40" cy="6" r="5"><animate attributeName="cy" values="6;0;6" dur="3s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.3;0;0.3" dur="3s" repeatCount="indefinite"/></circle>
+        <circle cx="72" cy="4" r="4"><animate attributeName="cy" values="4;-2;4" dur="4s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.25;0;0.25" dur="4s" repeatCount="indefinite"/></circle>
+      </g>
+      <!-- Eyes -->
+      <circle cx="40" cy="48" r="10" fill="white"/>
+      <circle cx="41.5" cy="49" r="5" fill="#333"/>
+      <circle cx="43" cy="47" r="1.5" fill="white"/>
+      <circle cx="72" cy="48" r="10" fill="white"/>
+      <circle cx="73.5" cy="49" r="5" fill="#333"/>
+      <circle cx="75" cy="47" r="1.5" fill="white"/>
+      <!-- Rosy cheeks -->
+      <circle cx="28" cy="58" r="6" fill="#e8886850"/>
+      <circle cx="84" cy="58" r="6" fill="#e8886850"/>
+      ${mouth}
+      <!-- Wheels -->
+      <circle cx="28" cy="88" r="9" fill="#444" stroke="#555" stroke-width="2"/><circle cx="28" cy="88" r="3" fill="#c9a227"/>
+      <circle cx="56" cy="88" r="8" fill="#444" stroke="#555" stroke-width="2"/><circle cx="56" cy="88" r="2.5" fill="#c9a227"/>
+      <circle cx="84" cy="88" r="9" fill="#444" stroke="#555" stroke-width="2"/><circle cx="84" cy="88" r="3" fill="#c9a227"/>
+      <!-- Headlamp -->
+      <circle cx="10" cy="44" r="5" fill="#FFD700" opacity="0.8"/><circle cx="10" cy="44" r="2.5" fill="#FFF8DC"/>
+    </svg>`;
   }
 };
 

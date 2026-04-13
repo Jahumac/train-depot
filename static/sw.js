@@ -3,7 +3,7 @@
  * Caches static assets for offline-capable PWA experience
  */
 
-const CACHE_NAME = 'train-depot-v1';
+const CACHE_NAME = 'train-depot-v1.1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

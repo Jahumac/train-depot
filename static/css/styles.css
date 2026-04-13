@@ -1524,3 +1524,101 @@ img { max-width: 100%; height: auto; }
   top: 50%;
   transform: translateY(-50%);
 }
+
+/* ==================== Styled Dialog Modals ==================== */
+
+.depot-dialog {
+  background: var(--modal-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 0;
+  max-width: 440px;
+  width: 90vw;
+  overflow: hidden;
+  animation: dialogSlideIn 0.25s ease;
+}
+
+@keyframes dialogSlideIn {
+  from { opacity: 0; transform: translateY(-16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.depot-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 28px 12px;
+  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
+  color: white;
+}
+
+.depot-dialog-mascot {
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.depot-dialog-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.depot-dialog-hint {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin: 4px 0 0;
+  font-style: italic;
+}
+
+.depot-dialog-body {
+  padding: 20px 28px;
+}
+
+.depot-dialog-message {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--color-text);
+}
+
+.depot-dialog-input {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 1.05rem;
+  padding: 12px 16px;
+}
+
+.depot-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 28px 24px;
+}
+
+/* ==================== Mascot Styles ==================== */
+
+.empty-mascot {
+  margin-bottom: 16px;
+  line-height: 0;
+  animation: mascotBob 3s ease-in-out infinite;
+}
+
+@keyframes mascotBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.toast-mascot {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+/* ==================== Hero Greeting ==================== */
+
+.hero-greeting {
+  font-size: 1rem;
+  color: rgba(255,255,255,0.7);
+  margin-top: 4px;
+  font-style: italic;
+}
