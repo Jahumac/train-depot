@@ -1407,3 +1407,120 @@ img { max-width: 100%; height: auto; }
   .catalog-layout { display: block; }
   .catalog-main { padding: 0; }
 }
+
+/* === New Features Styles === */
+
+/* Wishlist badge on cards */
+.item-card-wishlist-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.5);
+  color: #FFD700;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+}
+
+/* Wishlist toggle in form */
+.wishlist-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 10px 0;
+}
+.wishlist-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent);
+}
+.wishlist-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+/* Wishlist badge in detail view */
+.detail-wishlist-badge {
+  display: inline-block;
+  background: rgba(201,162,39,0.15);
+  color: var(--color-accent);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* Value tracking colors */
+.value-up { color: var(--color-success) !important; }
+.value-up::before { content: '↑ '; font-size: 0.8em; }
+.value-down { color: var(--color-danger) !important; }
+.value-down::before { content: '↓ '; font-size: 0.8em; }
+
+.item-card-value {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+/* Category management buttons */
+.category-group-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.category-group-label span:first-child {
+  cursor: pointer;
+}
+.cat-actions, .subcat-actions {
+  display: none;
+  gap: 2px;
+  margin-left: auto;
+}
+.category-group-label:hover .cat-actions,
+.subcategory-item:hover .subcat-actions {
+  display: flex;
+}
+.cat-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 5px;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  transition: var(--transition);
+}
+.cat-action-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+.cat-action-btn.danger:hover {
+  color: var(--color-danger);
+  background: rgba(198,40,40,0.1);
+}
+
+/* Clickable stat tags */
+.stat-tag.clickable {
+  cursor: pointer;
+  transition: var(--transition);
+}
+.stat-tag.clickable:hover {
+  background: rgba(255,255,255,0.2);
+}
+.stat-tag.clickable.active {
+  background: var(--color-accent);
+  color: var(--color-primary-dark);
+}
+
+/* Subcategory items with edit actions */
+.subcategory-item {
+  position: relative;
+}
+.subcategory-item .subcat-actions {
+  position: absolute;
+  right: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+}

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Train Depot — Login</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚂</text></svg>">
+  <style>
+    :root {
+      --color-primary: #1b4332;
+      --color-primary-light: #2d6a4f;
+      --color-accent: #c9a227;
+      --color-accent-light: #dbb840;
+      --color-bg: #f4f1eb;
+      --color-text: #2c2c2c;
+      --color-text-light: #5a5a5a;
+      --color-border: #d5d0c8;
+      --color-danger: #c62828;
+    }
+    [data-theme="dark"] {
+      --color-primary: #40916c;
+      --color-primary-light: #52b788;
+      --color-accent: #dbb840;
+      --color-accent-light: #e8cc5a;
+      --color-bg: #141a17;
+      --color-text: #e0e0dc;
+      --color-text-light: #a0a09a;
+      --color-border: #2e3a32;
+      --color-danger: #ef5350;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+    .login-container {
+      width: 100%;
+      max-width: 420px;
+      padding: 20px;
+    }
+    .login-card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.13);
+      padding: 48px 40px;
+      text-align: center;
+    }
+    [data-theme="dark"] .login-card {
+      background: #1c241f;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    }
+    .login-icon { font-size: 3rem; margin-bottom: 12px; }
+    .login-title {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin-bottom: 4px;
+    }
+    .login-subtitle {
+      color: var(--color-text-light);
+      font-size: 0.95rem;
+      margin-bottom: 32px;
+    }
+    .form-group {
+      text-align: left;
+      margin-bottom: 20px;
+    }
+    .form-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--color-text-light);
+      margin-bottom: 6px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid var(--color-border);
+      border-radius: 10px;
+      font-size: 1rem;
+      background: var(--color-bg);
+      color: var(--color-text);
+      transition: border-color 0.2s;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: var(--color-accent);
+    }
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
+      color: white;
+    }
+    .btn-login:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(27,67,50,0.4);
+    }
+    .btn-login:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .error-msg {
+      color: var(--color-danger);
+      font-size: 0.9rem;
+      margin-top: 12px;
+      display: none;
+    }
+    .setup-note {
+      background: rgba(201,162,39,0.15);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+      color: var(--color-text);
+    }
+    .setup-note strong { color: var(--color-accent); }
+    .theme-btn {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      background: rgba(0,0,0,0.1);
+      border: none;
+      border-radius: 20px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 1.1rem;
+    }
+    [data-theme="dark"] .theme-btn { background: rgba(255,255,255,0.1); }
+  </style>
+  <script>
+    (function() {
+      const saved = localStorage.getItem('trainCatalogTheme');
+      if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
+
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-icon">🚂</div>
+      <h1 class="login-title" id="loginTitle">Train Depot</h1>
+      <p class="login-subtitle" id="loginSubtitle">Sign in to your collection</p>
+
+      <div id="setupNote" class="setup-note" style="display:none;">
+        <strong>First-time setup!</strong> Choose a password to protect your collection. You can change or remove it later in Settings.
+      </div>
+
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label" id="passwordLabel">Password</label>
+          <input type="password" class="form-input" id="password" placeholder="Enter your password" autofocus required>
+        </div>
+        <div id="confirmGroup" class="form-group" style="display:none;">
+          <label class="form-label">Confirm Password</label>
+          <input type="password" class="form-input" id="passwordConfirm" placeholder="Confirm your password">
+        </div>
+        <button type="submit" class="btn-login" id="loginBtn">🔓 Sign In</button>
+        <div class="error-msg" id="errorMsg"></div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let isSetup = false;
+
+    // Check auth status on load
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/auth/status');
+        const data = await res.json();
+
+        if (data.authenticated) {
+          window.location.href = '/';
+          return;
+        }
+
+        if (data.requiresSetup) {
+          isSetup = true;
+          document.getElementById('setupNote').style.display = 'block';
+          document.getElementById('loginSubtitle').textContent = 'Set up your password';
+          document.getElementById('passwordLabel').textContent = 'Choose a Password';
+          document.getElementById('password').placeholder = 'Choose a password (4+ characters)';
+          document.getElementById('confirmGroup').style.display = 'block';
+          document.getElementById('loginBtn').textContent = '🔐 Set Password & Sign In';
+        }
+
+        // Load app name
+        try {
+          const settingsRes = await fetch('/api/auth/status');
+          // App name from settings needs authenticated access; use title from page
+        } catch(e) {}
+      } catch (e) {
+        showError('Cannot connect to server');
+      }
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      const password = document.getElementById('password').value;
+      const confirm = document.getElementById('passwordConfirm').value;
+
+      if (!password) { showError('Password is required'); return; }
+
+      if (isSetup) {
+        if (password.length < 4) { showError('Password must be at least 4 characters'); return; }
+        if (password !== confirm) { showError('Passwords do not match'); return; }
+      }
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Signing in...';
+      hideError();
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          showError(data.error || 'Login failed');
+          btn.disabled = false;
+          btn.textContent = isSetup ? '🔐 Set Password & Sign In' : '🔓 Sign In';
+        }
+      } catch (e) {
+        showError('Connection error — is the server running?');
+        btn.disabled = false;
+        btn.textContent = isSetup ? '🔐 Set Password & Sign In' : '🔓 Sign In';
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function hideError() {
+      document.getElementById('errorMsg').style.display = 'none';
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      if (next === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      localStorage.setItem('trainCatalogTheme', next);
+      document.getElementById('themeBtn').textContent = next === 'dark' ? '☀️' : '🌙';
+    }
+
+    // Init
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    document.getElementById('themeBtn').textContent = isDark ? '☀️' : '🌙';
+    checkStatus();
+  </script>
+</body>
+</html>

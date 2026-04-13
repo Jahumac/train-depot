@@ -4,8 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Train Depot</title>
-  <link rel="stylesheet" href="/css/styles.css?v=5">
+  <link rel="stylesheet" href="/css/styles.css?v=6">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚂</text></svg>">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1b4332">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <script>
     // Apply saved theme immediately to prevent flash
     (function() {
@@ -33,6 +38,9 @@
         </div>
         <button class="theme-toggle" onclick="app.toggleTheme()" title="Toggle dark mode">
           <span class="theme-icon" id="themeIcon">🌙</span>
+        </button>
+        <button class="theme-toggle" onclick="app.logout()" title="Sign out" id="logoutBtn" style="display:none;">
+          <span>🔒</span>
         </button>
       </div>
       <button class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</button>
@@ -102,9 +110,22 @@
               <input type="number" class="form-input" id="formPrice" step="0.01" min="0" placeholder="0.00">
             </div>
             <div class="form-group">
+              <label class="form-label">Current Value (£)</label>
+              <input type="number" class="form-input" id="formCurrentValue" step="0.01" min="0" placeholder="0.00">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
               <label class="form-label">Place of Purchase</label>
               <input type="text" class="form-input" id="formPlace" placeholder="Start typing..." autocomplete="off" oninput="app.suggest.show('formPlace', 'retailers')" onblur="setTimeout(()=>app.suggest.hide('formPlace'),200)">
               <ul class="autosuggest-list" id="suggest-formPlace" style="display:none"></ul>
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:4px;">
+              <label class="wishlist-toggle">
+                <input type="checkbox" id="formWishlist">
+                <span class="wishlist-label">⭐ Wishlist item</span>
+              </label>
             </div>
           </div>
 
@@ -156,6 +177,12 @@
   </footer>
 
   <script src="/js/reference-db.js?v=4"></script>
-  <script src="/js/app.js?v=5"></script>
+  <script src="/js/app.js?v=6"></script>
+  <script>
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
 </body>
 </html>

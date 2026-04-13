@@ -9,12 +9,13 @@ LABEL org.opencontainers.image.source="https://github.com/jahumac/train-depot"
 WORKDIR /app
 
 # Copy application files
-COPY package.json server.js database.js seed.js start.sh ./
+COPY package.json server.js database.js ./
+COPY seed.js start.sh ./
 COPY static/ ./static/
 
 # Create data and upload directories
-RUN mkdir -p /app/data /app/static/images/uploads \
-    && chmod +x start.sh
+RUN mkdir -p /app/data /app/data/uploads \
+    && chmod +x start.sh 2>/dev/null || true
 
 # Persistent volumes for user data
 VOLUME ["/app/data", "/app/static/images/uploads"]

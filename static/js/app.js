@@ -15,6 +15,7 @@ const app = {
   pendingImages: [],
   existingImages: [],
   selectedRefModel: null,    // reference model selected from the DB
+  showWishlistOnly: false,   // wishlist filter toggle
 
   // ==================== Auto-Suggest Database ====================
 
@@ -447,6 +448,19 @@ const app = {
   // ==================== Initialization ====================
 
   async init() {
+    // Check auth status; redirect to login if needed
+    try {
+      const authRes = await fetch('/api/auth/status');
+      const auth = await authRes.json();
+      if (!auth.authenticated && auth.hasPassword) {
+        window.location.href = '/login.html';
+        return;
+      }
+      // Show logout button if password is set
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn && auth.hasPassword) logoutBtn.style.display = '';
+    } catch(e) { /* continue anyway */ }
+
     await this.loadSettings();
     await this.loadCategories();
     await this.loadAllItems();
@@ -454,6 +468,13 @@ const app = {
     this.initTheme();
     this.applyAppName();
     this.showLanding();
+  },
+
+  async logout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch(e) {}
+    window.location.href = '/login.html';
   },
 
   async loadSettings() {
@@ -514,6 +535,10 @@ const app = {
   async api(endpoint, options = {}) {
     try {
       const res = await fetch(endpoint, options);
+      if (res.status === 401) {
+        window.location.href = '/login.html';
+        throw new Error('Session expired');
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Request failed' }));
         throw new Error(err.error || `HTTP ${res.status}`);
@@ -557,6 +582,7 @@ const app = {
   async showCatalog(filter = null) {
     this.currentView = 'catalog';
     this.currentFilter = filter;
+    this.showWishlistOnly = false;
     this.setNav('catalog');
 
     let params = '';
@@ -606,8 +632,14 @@ const app = {
     bar.innerHTML = `
       <span class="stat-tag accent">
         <span class="stat-icon">💷</span>
-        Total Spent: <span class="stat-value">${this.settings.currency}${s.totalSpent.toLocaleString('en-GB', {minimumFractionDigits:2})}</span>
+        Spent: <span class="stat-value">${this.settings.currency}${s.totalSpent.toLocaleString('en-GB', {minimumFractionDigits:2})}</span>
       </span>
+      ${s.totalCurrentValue > 0 ? `
+      <span class="stat-tag accent">
+        <span class="stat-icon">📈</span>
+        Value: <span class="stat-value">${this.settings.currency}${s.totalCurrentValue.toLocaleString('en-GB', {minimumFractionDigits:2})}</span>
+      </span>
+      ` : ''}
       <span class="stat-tag">
         <span class="stat-icon">🚂</span>
         Locomotives: <span class="stat-value">${s.locomotiveCount}</span>
@@ -618,8 +650,14 @@ const app = {
       </span>
       <span class="stat-tag">
         <span class="stat-icon">📦</span>
-        Total Items: <span class="stat-value">${s.totalItems}</span>
+        Total: <span class="stat-value">${s.totalItems}</span>
       </span>
+      ${s.wishlistCount > 0 ? `
+      <span class="stat-tag clickable ${this.showWishlistOnly ? 'active' : ''}" onclick="app.toggleWishlist()">
+        <span class="stat-icon">⭐</span>
+        Wishlist: <span class="stat-value">${s.wishlistCount}</span>
+      </span>
+      ` : ''}
       ${this.renderSubcategoryStats(s)}
     `;
   },
@@ -763,24 +801,41 @@ const app = {
 
   renderSidebar() {
     const s = this.stats;
+    const catIcon = (id) => id === 'locomotives' ? '🚂' : id === 'rolling-stock' ? '🚃' : '📦';
     return `
       <aside class="sidebar">
         <div class="sidebar-title">Categories</div>
         <ul class="category-list">
-          <li class="subcategory-item ${!this.currentFilter ? 'active' : ''}"
+          <li class="subcategory-item ${!this.currentFilter && !this.showWishlistOnly ? 'active' : ''}"
               onclick="app.showCatalog()">
             All Items
             <span class="subcategory-count">${s ? s.totalItems : ''}</span>
           </li>
+          ${s && s.wishlistCount > 0 ? `
+          <li class="subcategory-item ${this.showWishlistOnly ? 'active' : ''}"
+              onclick="app.toggleWishlist()">
+            ⭐ Wishlist
+            <span class="subcategory-count">${s.wishlistCount}</span>
+          </li>
+          ` : ''}
           ${this.categories.map(cat => `
-            <li class="category-group-label" onclick="app.showCatalog({type:'category',value:'${cat.id}'})">
-              ${cat.id === 'locomotives' ? '🚂' : '🚃'} ${cat.name}
+            <li class="category-group-label">
+              <span onclick="app.showCatalog({type:'category',value:'${cat.id}'})">${catIcon(cat.id)} ${cat.name}</span>
+              <span class="cat-actions">
+                <button class="cat-action-btn" onclick="event.stopPropagation();app.addSubcategory('${cat.id}')" title="Add subcategory">+</button>
+                <button class="cat-action-btn" onclick="event.stopPropagation();app.renameCategory('${cat.id}')" title="Rename">✎</button>
+                <button class="cat-action-btn danger" onclick="event.stopPropagation();app.removeCategoryConfirm('${cat.id}')" title="Delete">×</button>
+              </span>
             </li>
             <ul class="subcategory-list">
               ${cat.subcategories.map(sub => `
                 <li class="subcategory-item ${this.currentFilter?.value === sub.id ? 'active' : ''}"
                     onclick="app.showCatalog({type:'subcategory',value:'${sub.id}'})">
                   ${sub.name}
+                  <span class="subcat-actions">
+                    <button class="cat-action-btn" onclick="event.stopPropagation();app.renameSubcategory('${cat.id}','${sub.id}')" title="Rename">✎</button>
+                    <button class="cat-action-btn danger" onclick="event.stopPropagation();app.removeSubcategoryConfirm('${cat.id}','${sub.id}')" title="Delete">×</button>
+                  </span>
                   <span class="subcategory-count">${s?.bySubcategory?.[sub.id]?.count ?? 0}</span>
                 </li>
               `).join('')}
@@ -788,6 +843,7 @@ const app = {
           `).join('')}
         </ul>
         <div class="sidebar-actions">
+          <button class="btn btn-outline btn-sm" onclick="app.addCategory()" style="width:100%;margin-bottom:8px;">📁 Add Category</button>
           <button class="btn btn-outline btn-sm" onclick="app.openAddModal()" style="width:100%">➕ Add New Item</button>
         </div>
       </aside>
@@ -804,12 +860,14 @@ const app = {
         <div class="item-card-image">
           ${img}
           ${subcatName ? `<span class="item-card-badge">${subcatName}</span>` : ''}
+          ${item.wishlist ? '<span class="item-card-wishlist-badge">⭐</span>' : ''}
         </div>
         <div class="item-card-body">
           <div class="item-card-name">${this.esc(item.name)}</div>
           <div class="item-card-manufacturer">${this.esc(item.manufacturer || 'Unknown manufacturer')}</div>
           <div class="item-card-meta">
             <span class="item-card-price">${item.purchasePrice ? this.settings.currency + item.purchasePrice.toFixed(2) : '—'}</span>
+            ${item.currentValue ? `<span class="item-card-value">Val: ${this.settings.currency}${item.currentValue.toFixed(2)}</span>` : ''}
             ${item.livery ? `<span class="item-card-livery">${this.esc(item.livery)}</span>` : ''}
           </div>
           ${this.daysSinceService(item.lastServiceDate) > (this.settings.serviceIntervalDays || 365) ? '<div class="item-card-service-warn">🔧 Service overdue</div>' : ''}
@@ -872,10 +930,16 @@ const app = {
               <h1 class="detail-name">${this.esc(item.name)}</h1>
               ${subcatName ? `<span class="detail-category-badge">${catName} &mdash; ${subcatName}</span>` : ''}
 
+              ${item.wishlist ? '<div class="detail-wishlist-badge">⭐ Wishlist Item</div>' : ''}
+
               <div class="detail-fields">
                 <div class="detail-field">
                   <span class="detail-field-label">Purchase Price</span>
                   <span class="detail-field-value price">${item.purchasePrice ? this.settings.currency + item.purchasePrice.toFixed(2) : '—'}</span>
+                </div>
+                <div class="detail-field">
+                  <span class="detail-field-label">Current Value</span>
+                  <span class="detail-field-value ${item.currentValue && item.purchasePrice ? (item.currentValue > item.purchasePrice ? 'value-up' : item.currentValue < item.purchasePrice ? 'value-down' : '') : ''}">${item.currentValue ? this.settings.currency + item.currentValue.toFixed(2) : '—'}</span>
                 </div>
                 <div class="detail-field">
                   <span class="detail-field-label">Manufacturer</span>
@@ -954,6 +1018,25 @@ const app = {
                 <button class="btn btn-primary" onclick="app.saveSettings()">💾 Save Settings</button>
               </div>
             </div>
+
+            <div class="backup-panel">
+              <h3>🔒 Password Protection</h3>
+              <p>Protect your catalogue with a password. Leave empty to remove password protection.</p>
+              <div class="settings-form" id="passwordSection">
+                <div class="form-group">
+                  <label class="form-label">New Password</label>
+                  <input type="password" class="form-input" id="settingsNewPassword" placeholder="Enter new password (4+ chars)">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Confirm New Password</label>
+                  <input type="password" class="form-input" id="settingsConfirmPassword" placeholder="Confirm new password">
+                </div>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-primary" onclick="app.changePassword()">🔐 Set Password</button>
+                  <button class="btn btn-outline" onclick="app.removePasswordUI()">🔓 Remove Password</button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <h2>Backup & Export</h2>
@@ -978,6 +1061,13 @@ const app = {
               <p>Export a summary of your collection as a CSV spreadsheet.</p>
               <button class="btn btn-outline" onclick="app.exportCSV()">Download CSV</button>
             </div>
+
+            <div class="backup-panel">
+              <h3>📥 Bulk CSV Import</h3>
+              <p>Import multiple items from a CSV file. Expected columns: Name, Manufacturer, Livery, Purchase Price, Current Value, Place of Purchase, Category, Subcategory, etc.</p>
+              <input type="file" id="csvImportFile" accept=".csv" style="display:none" onchange="app.importCSV(event)">
+              <button class="btn btn-outline" onclick="document.getElementById('csvImportFile').click()">Choose CSV File</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1000,6 +1090,41 @@ const app = {
       });
       this.applyAppName();
       this.toast('Settings saved!');
+    } catch(e) { /* toast shown */ }
+  },
+
+  async changePassword() {
+    const newPass = document.getElementById('settingsNewPassword').value;
+    const confirm = document.getElementById('settingsConfirmPassword').value;
+    if (!newPass || newPass.length < 4) { this.toast('Password must be at least 4 characters', 'error'); return; }
+    if (newPass !== confirm) { this.toast('Passwords do not match', 'error'); return; }
+    try {
+      await this.api('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword: newPass })
+      });
+      this.toast('Password updated!');
+      document.getElementById('settingsNewPassword').value = '';
+      document.getElementById('settingsConfirmPassword').value = '';
+      // Show logout button
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) logoutBtn.style.display = '';
+    } catch(e) { /* toast shown */ }
+  },
+
+  async removePasswordUI() {
+    const currentPass = prompt('Enter your current password to confirm removal:');
+    if (currentPass === null) return;
+    try {
+      await this.api('/api/auth/remove-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: currentPass })
+      });
+      this.toast('Password removed — app is now open access');
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) logoutBtn.style.display = 'none';
     } catch(e) { /* toast shown */ }
   },
 
@@ -1037,10 +1162,12 @@ const app = {
     document.getElementById('formManufacturer').value = item.manufacturer || '';
     document.getElementById('formLivery').value = item.livery || '';
     document.getElementById('formPrice').value = item.purchasePrice || '';
+    document.getElementById('formCurrentValue').value = item.currentValue || '';
     document.getElementById('formPlace').value = item.placeOfPurchase || '';
     document.getElementById('formServiceDate').value = item.lastServiceDate || '';
     document.getElementById('formGoesWellWith').value = item.goesWellWith || '';
     document.getElementById('formHistory').value = item.historicalBackground || '';
+    document.getElementById('formWishlist').checked = item.wishlist || false;
 
     this.renderUploadPreviews();
     document.getElementById('itemModal').classList.add('active');
@@ -1189,10 +1316,12 @@ const app = {
         manufacturer: document.getElementById('formManufacturer').value.trim(),
         livery: document.getElementById('formLivery').value.trim(),
         purchasePrice: document.getElementById('formPrice').value || 0,
+        currentValue: document.getElementById('formCurrentValue').value || 0,
         placeOfPurchase: document.getElementById('formPlace').value.trim(),
         lastServiceDate: document.getElementById('formServiceDate').value,
         goesWellWith: document.getElementById('formGoesWellWith').value.trim(),
         historicalBackground: document.getElementById('formHistory').value.trim(),
+        wishlist: document.getElementById('formWishlist').checked,
         images: allImages
       };
 
@@ -1309,7 +1438,7 @@ const app = {
     fetch('/api/items')
       .then(r => r.json())
       .then(allItems => {
-        const headers = ['Name','Category','Subcategory','Manufacturer','Livery','Purchase Price','Place of Purchase','Last Service Date','Goes Well With','Historical Background'];
+        const headers = ['Name','Category','Subcategory','Manufacturer','Livery','Purchase Price','Current Value','Place of Purchase','Last Service Date','Goes Well With','Historical Background','Wishlist'];
         const rows = allItems.map(item => [
           `"${(item.name||'').replace(/"/g,'""')}"`,
           `"${this.getCategoryName(item.categoryId)}"`,
@@ -1317,10 +1446,12 @@ const app = {
           `"${(item.manufacturer||'').replace(/"/g,'""')}"`,
           `"${(item.livery||'').replace(/"/g,'""')}"`,
           item.purchasePrice || 0,
+          item.currentValue || 0,
           `"${(item.placeOfPurchase||'').replace(/"/g,'""')}"`,
           `"${item.lastServiceDate||''}"`,
           `"${(item.goesWellWith||'').replace(/"/g,'""')}"`,
-          `"${(item.historicalBackground||'').replace(/"/g,'""')}"`
+          `"${(item.historicalBackground||'').replace(/"/g,'""')}"`,
+          item.wishlist ? 'yes' : 'no'
         ]);
 
         const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -1333,6 +1464,138 @@ const app = {
         URL.revokeObjectURL(url);
         this.toast('CSV export downloaded');
       });
+  },
+
+  // ==================== Wishlist ====================
+
+  async toggleWishlist() {
+    this.showWishlistOnly = !this.showWishlistOnly;
+    if (this.showWishlistOnly) {
+      await this.loadItems('?wishlist=true');
+    } else {
+      let params = '';
+      if (this.currentFilter) {
+        if (this.currentFilter.type === 'search') params = `?search=${encodeURIComponent(this.currentFilter.value)}`;
+        else if (this.currentFilter.type === 'category') params = `?category=${this.currentFilter.value}`;
+        else if (this.currentFilter.type === 'subcategory') params = `?subcategory=${this.currentFilter.value}`;
+      }
+      await this.loadItems(params);
+    }
+    this.render();
+    this.renderStats();
+  },
+
+  // ==================== CSV Import ====================
+
+  async importCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      const result = await this.api('/api/items/csv-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/csv' },
+        body: text
+      });
+      this.toast(`${result.message}`);
+      if (result.errors && result.errors.length > 0) {
+        console.warn('CSV import errors:', result.errors);
+      }
+      await this.loadAllItems();
+      await this.loadStats();
+      await this.loadCategories();
+      this.showCatalog();
+    } catch (e) { /* toast shown */ }
+    event.target.value = '';
+  },
+
+  // ==================== Category Management ====================
+
+  async addCategory() {
+    const name = prompt('Enter new category name:');
+    if (!name || !name.trim()) return;
+    try {
+      await this.api('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() })
+      });
+      this.toast('Category added!');
+      await this.loadCategories();
+      await this.loadStats();
+      this.render();
+    } catch(e) { /* toast shown */ }
+  },
+
+  async renameCategory(id) {
+    const cat = this.categories.find(c => c.id === id);
+    const name = prompt('Rename category:', cat ? cat.name : '');
+    if (!name || !name.trim()) return;
+    try {
+      await this.api(`/api/categories/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() })
+      });
+      this.toast('Category renamed!');
+      await this.loadCategories();
+      this.render();
+    } catch(e) { /* toast shown */ }
+  },
+
+  async removeCategoryConfirm(id) {
+    if (!confirm('Delete this category? This cannot be undone.')) return;
+    try {
+      await this.api(`/api/categories/${id}`, { method: 'DELETE' });
+      this.toast('Category deleted');
+      await this.loadCategories();
+      await this.loadStats();
+      this.showCatalog();
+    } catch(e) { /* toast shown */ }
+  },
+
+  async addSubcategory(categoryId) {
+    const name = prompt('Enter new subcategory name:');
+    if (!name || !name.trim()) return;
+    try {
+      await this.api(`/api/categories/${categoryId}/subcategories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() })
+      });
+      this.toast('Subcategory added!');
+      await this.loadCategories();
+      await this.loadStats();
+      this.render();
+    } catch(e) { /* toast shown */ }
+  },
+
+  async renameSubcategory(categoryId, subcategoryId) {
+    const cat = this.categories.find(c => c.id === categoryId);
+    const sub = cat ? cat.subcategories.find(s => s.id === subcategoryId) : null;
+    const name = prompt('Rename subcategory:', sub ? sub.name : '');
+    if (!name || !name.trim()) return;
+    try {
+      await this.api(`/api/categories/${categoryId}/subcategories/${subcategoryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() })
+      });
+      this.toast('Subcategory renamed!');
+      await this.loadCategories();
+      this.render();
+    } catch(e) { /* toast shown */ }
+  },
+
+  async removeSubcategoryConfirm(categoryId, subcategoryId) {
+    if (!confirm('Delete this subcategory? This cannot be undone.')) return;
+    try {
+      await this.api(`/api/categories/${categoryId}/subcategories/${subcategoryId}`, { method: 'DELETE' });
+      this.toast('Subcategory deleted');
+      await this.loadCategories();
+      await this.loadStats();
+      this.showCatalog();
+    } catch(e) { /* toast shown */ }
   },
 
   // ==================== Sorting ====================

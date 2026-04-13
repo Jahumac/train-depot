@@ -46,7 +46,9 @@ const DEFAULT_SETTINGS = {
   appName: 'Train Depot',
   tagline: 'Your personal collection, beautifully organised',
   currency: '£',
-  serviceIntervalDays: 365
+  serviceIntervalDays: 365,
+  passwordHash: '',
+  passwordSalt: ''
 };
 
 // --- In-memory cache ---
@@ -107,6 +109,46 @@ function generateId() {
   return crypto.randomUUID();
 }
 
+// --- Password Hashing (PBKDF2 via Node built-in crypto) ---
+
+function hashPassword(password, salt) {
+  if (!salt) salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  return { hash, salt };
+}
+
+function setPassword(password) {
+  const db = readDb();
+  if (!db.settings) db.settings = { ...DEFAULT_SETTINGS };
+  const { hash, salt } = hashPassword(password);
+  db.settings.passwordHash = hash;
+  db.settings.passwordSalt = salt;
+  writeDb(db);
+  return true;
+}
+
+function verifyPassword(password) {
+  const db = readDb();
+  const settings = db.settings || {};
+  if (!settings.passwordHash || !settings.passwordSalt) return false;
+  const { hash } = hashPassword(password, settings.passwordSalt);
+  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(settings.passwordHash));
+}
+
+function hasPassword() {
+  const db = readDb();
+  return !!(db.settings && db.settings.passwordHash);
+}
+
+function removePassword() {
+  const db = readDb();
+  if (!db.settings) db.settings = { ...DEFAULT_SETTINGS };
+  db.settings.passwordHash = '';
+  db.settings.passwordSalt = '';
+  writeDb(db);
+  return true;
+}
+
 // --- Item CRUD ---
 
 function getAllItems() {
@@ -127,6 +169,7 @@ function createItem(itemData) {
     name: itemData.name || '',
     manufacturer: itemData.manufacturer || '',
     purchasePrice: parseFloat(itemData.purchasePrice) || 0,
+    currentValue: parseFloat(itemData.currentValue) || 0,
     placeOfPurchase: itemData.placeOfPurchase || '',
     livery: itemData.livery || '',
     historicalBackground: itemData.historicalBackground || '',
@@ -135,6 +178,7 @@ function createItem(itemData) {
     categoryId: itemData.categoryId || '',
     subcategoryId: itemData.subcategoryId || '',
     images: itemData.images || [],
+    wishlist: itemData.wishlist || false,
     createdAt: now,
     updatedAt: now
   };
@@ -149,13 +193,19 @@ function updateItem(id, updates) {
   const idx = db.items.findIndex(item => item.id === id);
   if (idx === -1) return null;
 
-  const allowed = ['name', 'manufacturer', 'purchasePrice', 'placeOfPurchase',
+  const allowed = ['name', 'manufacturer', 'purchasePrice', 'currentValue', 'placeOfPurchase',
     'livery', 'historicalBackground', 'goesWellWith', 'lastServiceDate',
-    'categoryId', 'subcategoryId', 'images'];
+    'categoryId', 'subcategoryId', 'images', 'wishlist'];
 
   for (const key of allowed) {
     if (updates[key] !== undefined) {
-      db.items[idx][key] = key === 'purchasePrice' ? parseFloat(updates[key]) || 0 : updates[key];
+      if (key === 'purchasePrice' || key === 'currentValue') {
+        db.items[idx][key] = parseFloat(updates[key]) || 0;
+      } else if (key === 'wishlist') {
+        db.items[idx][key] = !!updates[key];
+      } else {
+        db.items[idx][key] = updates[key];
+      }
     }
   }
   db.items[idx].updatedAt = new Date().toISOString();
@@ -194,11 +244,88 @@ function getItemsBySubcategory(subcategoryId) {
   return db.items.filter(item => item.subcategoryId === subcategoryId);
 }
 
-// --- Category operations ---
+// --- Category CRUD ---
 
 function getCategories() {
   const db = readDb();
   return db.categories;
+}
+
+function addCategory(name) {
+  const db = readDb();
+  const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  // Check for duplicate id
+  if (db.categories.some(c => c.id === id)) {
+    throw new Error(`Category "${name}" already exists`);
+  }
+  const cat = { id, name, subcategories: [] };
+  db.categories.push(cat);
+  writeDb(db);
+  return cat;
+}
+
+function updateCategory(id, newName) {
+  const db = readDb();
+  const cat = db.categories.find(c => c.id === id);
+  if (!cat) return null;
+  cat.name = newName;
+  writeDb(db);
+  return cat;
+}
+
+function deleteCategory(id) {
+  const db = readDb();
+  const idx = db.categories.findIndex(c => c.id === id);
+  if (idx === -1) return null;
+  // Don't allow delete if items reference this category
+  const itemCount = db.items.filter(item => item.categoryId === id).length;
+  if (itemCount > 0) {
+    throw new Error(`Cannot delete category: ${itemCount} items still reference it`);
+  }
+  const deleted = db.categories.splice(idx, 1)[0];
+  writeDb(db);
+  return deleted;
+}
+
+function addSubcategory(categoryId, name) {
+  const db = readDb();
+  const cat = db.categories.find(c => c.id === categoryId);
+  if (!cat) throw new Error('Category not found');
+  const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  if (cat.subcategories.some(s => s.id === id)) {
+    throw new Error(`Subcategory "${name}" already exists in this category`);
+  }
+  const sub = { id, name, parent: categoryId };
+  cat.subcategories.push(sub);
+  writeDb(db);
+  return sub;
+}
+
+function updateSubcategory(categoryId, subcategoryId, newName) {
+  const db = readDb();
+  const cat = db.categories.find(c => c.id === categoryId);
+  if (!cat) return null;
+  const sub = cat.subcategories.find(s => s.id === subcategoryId);
+  if (!sub) return null;
+  sub.name = newName;
+  writeDb(db);
+  return sub;
+}
+
+function deleteSubcategory(categoryId, subcategoryId) {
+  const db = readDb();
+  const cat = db.categories.find(c => c.id === categoryId);
+  if (!cat) return null;
+  const idx = cat.subcategories.findIndex(s => s.id === subcategoryId);
+  if (idx === -1) return null;
+  // Don't allow delete if items reference this subcategory
+  const itemCount = db.items.filter(item => item.subcategoryId === subcategoryId).length;
+  if (itemCount > 0) {
+    throw new Error(`Cannot delete subcategory: ${itemCount} items still reference it`);
+  }
+  const deleted = cat.subcategories.splice(idx, 1)[0];
+  writeDb(db);
+  return deleted;
 }
 
 // --- Statistics ---
@@ -207,14 +334,14 @@ function getStats() {
   const db = readDb();
   const items = db.items;
   const totalSpent = items.reduce((sum, item) => sum + (item.purchasePrice || 0), 0);
+  const totalCurrentValue = items.reduce((sum, item) => sum + (item.currentValue || 0), 0);
   const locomotiveCount = items.filter(item => item.categoryId === 'locomotives').length;
   const rollingStockCount = items.filter(item => item.categoryId === 'rolling-stock').length;
+  const wishlistCount = items.filter(item => item.wishlist).length;
 
   const bySubcategory = {};
-  const allSubcats = [];
   for (const cat of db.categories) {
     for (const sub of cat.subcategories) {
-      allSubcats.push(sub);
       bySubcategory[sub.id] = {
         name: sub.name,
         parent: sub.parent,
@@ -223,12 +350,24 @@ function getStats() {
     }
   }
 
+  // Count items per category (including custom categories)
+  const byCategory = {};
+  for (const cat of db.categories) {
+    byCategory[cat.id] = {
+      name: cat.name,
+      count: items.filter(item => item.categoryId === cat.id).length
+    };
+  }
+
   return {
     totalItems: items.length,
     totalSpent: Math.round(totalSpent * 100) / 100,
+    totalCurrentValue: Math.round(totalCurrentValue * 100) / 100,
     locomotiveCount,
     rollingStockCount,
-    bySubcategory
+    wishlistCount,
+    bySubcategory,
+    byCategory
   };
 }
 
@@ -236,7 +375,14 @@ function getStats() {
 
 function getSettings() {
   const db = readDb();
-  // Merge defaults with stored settings (handles upgrades from older DBs)
+  const settings = { ...DEFAULT_SETTINGS, ...(db.settings || {}) };
+  // Never expose password hash/salt to the client via normal settings endpoint
+  const { passwordHash, passwordSalt, ...safeSettings } = settings;
+  return safeSettings;
+}
+
+function getSettingsInternal() {
+  const db = readDb();
   return { ...DEFAULT_SETTINGS, ...(db.settings || {}) };
 }
 
@@ -250,14 +396,22 @@ function updateSettings(updates) {
     }
   }
   writeDb(db);
-  return db.settings;
+  // Return safe settings (no password fields)
+  const { passwordHash, passwordSalt, ...safe } = db.settings;
+  return safe;
 }
 
 // --- Backup/Export ---
 
 function exportData() {
   const db = readDb();
-  return JSON.stringify(db, null, 2);
+  // Exclude password from exports
+  const exportDb = JSON.parse(JSON.stringify(db));
+  if (exportDb.settings) {
+    delete exportDb.settings.passwordHash;
+    delete exportDb.settings.passwordSalt;
+  }
+  return JSON.stringify(exportDb, null, 2);
 }
 
 function importData(jsonString) {
@@ -298,9 +452,15 @@ function importData(jsonString) {
     if (item.purchasePrice !== undefined && typeof item.purchasePrice !== 'number') {
       data.items[i].purchasePrice = parseFloat(item.purchasePrice) || 0;
     }
+    if (item.currentValue !== undefined && typeof item.currentValue !== 'number') {
+      data.items[i].currentValue = parseFloat(item.currentValue) || 0;
+    }
     if (item.images && !Array.isArray(item.images)) {
       data.items[i].images = [];
     }
+    // Ensure new fields have defaults
+    if (data.items[i].currentValue === undefined) data.items[i].currentValue = 0;
+    if (data.items[i].wishlist === undefined) data.items[i].wishlist = false;
   }
 
   // Ensure metadata exists
@@ -312,8 +472,16 @@ function importData(jsonString) {
     };
   }
 
+  // Preserve existing password when importing (don't overwrite auth)
+  const currentDb = readDb();
+  const currentPassword = currentDb.settings?.passwordHash || '';
+  const currentSalt = currentDb.settings?.passwordSalt || '';
+
   // Ensure settings exist (merge with defaults for older backups)
   data.settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
+  // Restore password from current DB
+  data.settings.passwordHash = currentPassword;
+  data.settings.passwordSalt = currentSalt;
 
   writeDb(data);
   return true;
@@ -331,8 +499,19 @@ module.exports = {
   getItemsByCategory,
   getItemsBySubcategory,
   getCategories,
+  addCategory,
+  updateCategory,
+  deleteCategory,
+  addSubcategory,
+  updateSubcategory,
+  deleteSubcategory,
   getSettings,
+  getSettingsInternal,
   updateSettings,
+  setPassword,
+  verifyPassword,
+  hasPassword,
+  removePassword,
   getStats,
   exportData,
   importData,
