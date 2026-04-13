@@ -48,7 +48,8 @@ const DEFAULT_SETTINGS = {
   currency: '£',
   serviceIntervalDays: 365,
   passwordHash: '',
-  passwordSalt: ''
+  passwordSalt: '',
+  shareToken: ''
 };
 
 // --- In-memory cache ---
@@ -67,7 +68,7 @@ function ensureDbExists() {
       metadata: {
         created: new Date().toISOString(),
         lastModified: new Date().toISOString(),
-        version: '1.2.0'
+        version: '1.3.0'
       }
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(defaultDb, null, 2));
@@ -151,9 +152,10 @@ function removePassword() {
 
 // --- Item CRUD ---
 
-function getAllItems() {
+function getAllItems(includeDeleted = false) {
   const db = readDb();
-  return db.items;
+  if (includeDeleted) return db.items;
+  return db.items.filter(item => !item.deleted);
 }
 
 function getItemById(id) {
@@ -179,6 +181,9 @@ function createItem(itemData) {
     subcategoryId: itemData.subcategoryId || '',
     images: itemData.images || [],
     wishlist: itemData.wishlist || false,
+    wishlistNotes: itemData.wishlistNotes || '',
+    wishlistSpottedPrice: parseFloat(itemData.wishlistSpottedPrice) || 0,
+    wishlistSpottedAt: itemData.wishlistSpottedAt || '',
     runningNumber: itemData.runningNumber || '',
     productCode: itemData.productCode || '',
     condition: itemData.condition || '',
@@ -187,6 +192,8 @@ function createItem(itemData) {
     storageLocation: itemData.storageLocation || '',
     serviceLog: itemData.serviceLog || [],
     tags: itemData.tags || [],
+    deleted: false,
+    deletedAt: null,
     createdAt: now,
     updatedAt: now
   };
@@ -204,12 +211,13 @@ function updateItem(id, updates) {
   const allowed = ['name', 'manufacturer', 'purchasePrice', 'currentValue', 'placeOfPurchase',
     'livery', 'historicalBackground', 'goesWellWith', 'lastServiceDate',
     'categoryId', 'subcategoryId', 'images', 'wishlist',
+    'wishlistNotes', 'wishlistSpottedPrice', 'wishlistSpottedAt',
     'runningNumber', 'productCode', 'condition', 'dccStatus', 'purchaseDate',
     'storageLocation', 'serviceLog', 'tags'];
 
   for (const key of allowed) {
     if (updates[key] !== undefined) {
-      if (key === 'purchasePrice' || key === 'currentValue') {
+      if (key === 'purchasePrice' || key === 'currentValue' || key === 'wishlistSpottedPrice') {
         db.items[idx][key] = parseFloat(updates[key]) || 0;
       } else if (key === 'wishlist') {
         db.items[idx][key] = !!updates[key];
@@ -229,15 +237,59 @@ function deleteItem(id) {
   const db = readDb();
   const idx = db.items.findIndex(item => item.id === id);
   if (idx === -1) return null;
-  const deleted = db.items.splice(idx, 1)[0];
+  // Soft delete: mark as deleted with timestamp
+  db.items[idx].deleted = true;
+  db.items[idx].deletedAt = new Date().toISOString();
+  db.items[idx].updatedAt = new Date().toISOString();
   writeDb(db);
-  return deleted;
+  return db.items[idx];
+}
+
+function restoreItem(id) {
+  const db = readDb();
+  const idx = db.items.findIndex(item => item.id === id);
+  if (idx === -1) return null;
+  db.items[idx].deleted = false;
+  db.items[idx].deletedAt = null;
+  db.items[idx].updatedAt = new Date().toISOString();
+  writeDb(db);
+  return db.items[idx];
+}
+
+function permanentlyDeleteItem(id) {
+  const db = readDb();
+  const idx = db.items.findIndex(item => item.id === id);
+  if (idx === -1) return null;
+  const removed = db.items.splice(idx, 1)[0];
+  writeDb(db);
+  return removed;
+}
+
+function getDeletedItems() {
+  const db = readDb();
+  return db.items.filter(item => item.deleted);
+}
+
+function purgeExpiredItems(days = 30) {
+  const db = readDb();
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const toRemove = db.items.filter(item => item.deleted && item.deletedAt && item.deletedAt < cutoff);
+  if (toRemove.length === 0) return [];
+  db.items = db.items.filter(item => !(item.deleted && item.deletedAt && item.deletedAt < cutoff));
+  writeDb(db);
+  return toRemove;
+}
+
+function findDuplicatesByProductCode(productCode) {
+  if (!productCode) return [];
+  const db = readDb();
+  return db.items.filter(item => !item.deleted && item.productCode && item.productCode.toLowerCase() === productCode.toLowerCase());
 }
 
 function searchItems(query) {
   const db = readDb();
   const q = query.toLowerCase();
-  return db.items.filter(item =>
+  return db.items.filter(item => !item.deleted).filter(item =>
     item.name.toLowerCase().includes(q) ||
     item.manufacturer.toLowerCase().includes(q) ||
     item.livery.toLowerCase().includes(q) ||
@@ -251,12 +303,12 @@ function searchItems(query) {
 
 function getItemsByCategory(categoryId) {
   const db = readDb();
-  return db.items.filter(item => item.categoryId === categoryId);
+  return db.items.filter(item => !item.deleted && item.categoryId === categoryId);
 }
 
 function getItemsBySubcategory(subcategoryId) {
   const db = readDb();
-  return db.items.filter(item => item.subcategoryId === subcategoryId);
+  return db.items.filter(item => !item.deleted && item.subcategoryId === subcategoryId);
 }
 
 // --- Category CRUD ---
@@ -346,7 +398,7 @@ function deleteSubcategory(categoryId, subcategoryId) {
 function getAllTags() {
   const db = readDb();
   const tagCounts = {};
-  for (const item of db.items) {
+  for (const item of db.items.filter(i => !i.deleted)) {
     if (item.tags && Array.isArray(item.tags)) {
       for (const tag of item.tags) {
         tagCounts[tag] = (tagCounts[tag] || 0) + 1;
@@ -360,7 +412,7 @@ function getAllTags() {
 function getItemsByTag(tag) {
   const db = readDb();
   return db.items.filter(item =>
-    item.tags && Array.isArray(item.tags) && item.tags.includes(tag)
+    !item.deleted && item.tags && Array.isArray(item.tags) && item.tags.includes(tag)
   );
 }
 
@@ -368,7 +420,7 @@ function getItemsByTag(tag) {
 
 function getStats() {
   const db = readDb();
-  const items = db.items;
+  const items = db.items.filter(i => !i.deleted);
   const totalSpent = items.reduce((sum, item) => sum + (item.purchasePrice || 0), 0);
   const totalCurrentValue = items.reduce((sum, item) => sum + (item.currentValue || 0), 0);
   const locomotiveCount = items.filter(item => item.categoryId === 'locomotives').length;
@@ -417,6 +469,33 @@ function getSettings() {
   return safeSettings;
 }
 
+function generateShareToken() {
+  const db = readDb();
+  if (!db.settings) db.settings = { ...DEFAULT_SETTINGS };
+  const token = crypto.randomBytes(16).toString('hex');
+  db.settings.shareToken = token;
+  writeDb(db);
+  return token;
+}
+
+function revokeShareToken() {
+  const db = readDb();
+  if (!db.settings) db.settings = { ...DEFAULT_SETTINGS };
+  db.settings.shareToken = '';
+  writeDb(db);
+}
+
+function getShareToken() {
+  const db = readDb();
+  return db.settings?.shareToken || '';
+}
+
+function verifyShareToken(token) {
+  if (!token) return false;
+  const db = readDb();
+  return db.settings?.shareToken === token && token.length > 0;
+}
+
 function getSettingsInternal() {
   const db = readDb();
   return { ...DEFAULT_SETTINGS, ...(db.settings || {}) };
@@ -425,7 +504,7 @@ function getSettingsInternal() {
 function updateSettings(updates) {
   const db = readDb();
   if (!db.settings) db.settings = { ...DEFAULT_SETTINGS };
-  const allowed = ['appName', 'tagline', 'currency', 'serviceIntervalDays'];
+  const allowed = ['appName', 'tagline', 'currency', 'serviceIntervalDays', 'shareToken'];
   for (const key of allowed) {
     if (updates[key] !== undefined) {
       db.settings[key] = updates[key];
@@ -531,6 +610,11 @@ module.exports = {
   createItem,
   updateItem,
   deleteItem,
+  restoreItem,
+  permanentlyDeleteItem,
+  getDeletedItems,
+  purgeExpiredItems,
+  findDuplicatesByProductCode,
   searchItems,
   getItemsByCategory,
   getItemsBySubcategory,
@@ -546,6 +630,10 @@ module.exports = {
   getSettings,
   getSettingsInternal,
   updateSettings,
+  generateShareToken,
+  revokeShareToken,
+  getShareToken,
+  verifyShareToken,
   setPassword,
   verifyPassword,
   hasPassword,

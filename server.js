@@ -412,6 +412,15 @@ async function handleApiRequest(req, res, pathname) {
     return sendJson(res, 200, items);
   }
 
+  // GET /api/items/check-duplicate?productCode=XYZ — duplicate detection (must be before :id match)
+  if (pathname === '/api/items/check-duplicate' && req.method === 'GET') {
+    const reqUrl2 = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const productCode = reqUrl2.searchParams.get('productCode');
+    if (!productCode) return sendJson(res, 200, { duplicates: [] });
+    const duplicates = db.findDuplicatesByProductCode(productCode);
+    return sendJson(res, 200, { duplicates: duplicates.map(d => ({ id: d.id, name: d.name, productCode: d.productCode })) });
+  }
+
   // GET /api/items/:id
   const itemMatch = pathname.match(/^\/api\/items\/([^/]+)$/);
   if (itemMatch && req.method === 'GET') {
@@ -442,22 +451,58 @@ async function handleApiRequest(req, res, pathname) {
     return sendJson(res, 200, item);
   }
 
-  // DELETE /api/items/:id
+  // DELETE /api/items/:id (soft delete)
   if (itemMatch && req.method === 'DELETE') {
     const deleted = db.deleteItem(itemMatch[1]);
     if (!deleted) return sendError(res, 404, 'Item not found');
+    return sendJson(res, 200, { message: 'Item moved to bin', item: deleted });
+  }
 
+  // GET /api/trash — list soft-deleted items
+  if (pathname === '/api/trash' && req.method === 'GET') {
+    return sendJson(res, 200, db.getDeletedItems());
+  }
+
+  // POST /api/trash/:id/restore — restore a soft-deleted item
+  const trashRestoreMatch = pathname.match(/^\/api\/trash\/([^/]+)\/restore$/);
+  if (trashRestoreMatch && req.method === 'POST') {
+    const restored = db.restoreItem(trashRestoreMatch[1]);
+    if (!restored) return sendError(res, 404, 'Item not found');
+    return sendJson(res, 200, { message: 'Item restored', item: restored });
+  }
+
+  // DELETE /api/trash/:id — permanently delete item
+  const trashDeleteMatch = pathname.match(/^\/api\/trash\/([^/]+)$/);
+  if (trashDeleteMatch && req.method === 'DELETE') {
+    const removed = db.permanentlyDeleteItem(trashDeleteMatch[1]);
+    if (!removed) return sendError(res, 404, 'Item not found');
     // Clean up orphaned image files
-    if (deleted.images && deleted.images.length > 0) {
-      for (const imgPath of deleted.images) {
+    if (removed.images && removed.images.length > 0) {
+      for (const imgPath of removed.images) {
         if (imgPath.startsWith('/uploads/')) {
           const filePath = path.join(UPLOAD_DIR, path.basename(imgPath));
-          fs.unlink(filePath, () => {}); // async, ignore errors
+          fs.unlink(filePath, () => {});
         }
       }
     }
+    return sendJson(res, 200, { message: 'Item permanently deleted' });
+  }
 
-    return sendJson(res, 200, { message: 'Item deleted' });
+  // POST /api/trash/purge — permanently delete all expired items
+  if (pathname === '/api/trash/purge' && req.method === 'POST') {
+    const purged = db.purgeExpiredItems(30);
+    // Clean up image files
+    for (const item of purged) {
+      if (item.images && item.images.length > 0) {
+        for (const imgPath of item.images) {
+          if (imgPath.startsWith('/uploads/')) {
+            const filePath = path.join(UPLOAD_DIR, path.basename(imgPath));
+            fs.unlink(filePath, () => {});
+          }
+        }
+      }
+    }
+    return sendJson(res, 200, { message: `Purged ${purged.length} expired items`, count: purged.length });
   }
 
   // POST /api/items/:id/service-log — add service log entry
@@ -738,6 +783,76 @@ async function handleApiRequest(req, res, pathname) {
     }
   }
 
+  // === Share Link Management ===
+
+  // POST /api/share/enable — generate a share token
+  if (pathname === '/api/share/enable' && req.method === 'POST') {
+    const token = db.generateShareToken();
+    return sendJson(res, 200, { token, message: 'Share link enabled' });
+  }
+
+  // POST /api/share/disable — revoke share token
+  if (pathname === '/api/share/disable' && req.method === 'POST') {
+    db.revokeShareToken();
+    return sendJson(res, 200, { message: 'Share link disabled' });
+  }
+
+  // GET /api/share/status — check share status
+  if (pathname === '/api/share/status' && req.method === 'GET') {
+    const token = db.getShareToken();
+    return sendJson(res, 200, { enabled: !!token, token: token || null });
+  }
+
+  // GET /api/health-check — data health check
+  if (pathname === '/api/health-check' && req.method === 'GET') {
+    const items = db.getAllItems();
+    const issues = [];
+    const interval = db.getSettings().serviceIntervalDays || 365;
+    const now = Date.now();
+
+    for (const item of items) {
+      const missing = [];
+      if (!item.images || item.images.length === 0) missing.push('photos');
+      if (!item.manufacturer) missing.push('manufacturer');
+      if (!item.livery) missing.push('livery');
+      if (!item.purchasePrice) missing.push('purchase price');
+      if (!item.condition) missing.push('condition');
+      if (!item.dccStatus) missing.push('DCC status');
+      if (!item.productCode) missing.push('product code');
+      if (!item.runningNumber) missing.push('running number');
+      if (!item.purchaseDate) missing.push('purchase date');
+      if (!item.storageLocation) missing.push('storage location');
+      if (!item.historicalBackground) missing.push('historical background');
+
+      const serviceOverdue = item.lastServiceDate &&
+        (now - new Date(item.lastServiceDate).getTime()) > interval * 24 * 60 * 60 * 1000;
+
+      if (missing.length > 0 || serviceOverdue) {
+        issues.push({
+          id: item.id,
+          name: item.name,
+          missingFields: missing,
+          serviceOverdue: !!serviceOverdue,
+          completeness: Math.round(((11 - missing.length) / 11) * 100)
+        });
+      }
+    }
+
+    // Sort by completeness (least complete first)
+    issues.sort((a, b) => a.completeness - b.completeness);
+
+    const avgCompleteness = items.length > 0
+      ? Math.round(issues.reduce((sum, i) => sum + i.completeness, 0) / Math.max(issues.length, 1))
+      : 100;
+
+    return sendJson(res, 200, {
+      totalItems: items.length,
+      itemsWithIssues: issues.length,
+      avgCompleteness,
+      issues: issues.slice(0, 50)
+    });
+  }
+
   return sendError(res, 404, 'API endpoint not found');
 }
 
@@ -780,6 +895,26 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    // Public share API (no auth required)
+    if (pathname === '/api/shared' && req.method === 'GET') {
+      const reqUrl2 = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      const token = reqUrl2.searchParams.get('token');
+      if (!token || !db.verifyShareToken(token)) {
+        return sendError(res, 403, 'Invalid or expired share link');
+      }
+      const items = db.getAllItems();
+      const categories = db.getCategories();
+      const stats = db.getStats();
+      const settings = db.getSettings();
+      return sendJson(res, 200, { items, categories, stats, settings });
+    }
+
+    // Serve shared view page (no auth required)
+    if (pathname === '/shared' || pathname === '/shared.html') {
+      const staticPath = path.join(__dirname, 'static', 'shared.html');
+      return serveStaticFile(res, staticPath);
+    }
+
     // API routes
     if (pathname.startsWith('/api/')) {
       return await handleApiRequest(req, res, pathname);
@@ -787,7 +922,7 @@ const server = http.createServer(async (req, res) => {
 
     // Auth check for non-API routes (static files, pages)
     // Always allow: login page, its assets, service worker, manifest
-    const publicPaths = ['/login.html', '/css/', '/js/', '/manifest.json', '/sw.js', '/favicon'];
+    const publicPaths = ['/login.html', '/shared', '/css/', '/js/', '/manifest.json', '/sw.js', '/favicon', '/icons/'];
     const isPublic = publicPaths.some(p => pathname.startsWith(p) || pathname === p);
 
     if (!isPublic && !isAuthenticated(req)) {
@@ -828,6 +963,26 @@ const server = http.createServer(async (req, res) => {
 
 // Initialize database
 db.ensureDbExists();
+
+// Auto-purge expired soft-deleted items on startup and daily
+const purgeExpired = () => {
+  const purged = db.purgeExpiredItems(30);
+  if (purged.length > 0) {
+    console.log(`  Purged ${purged.length} expired items from trash`);
+    for (const item of purged) {
+      if (item.images && item.images.length > 0) {
+        for (const imgPath of item.images) {
+          if (imgPath.startsWith('/uploads/')) {
+            const filePath = path.join(UPLOAD_DIR, path.basename(imgPath));
+            fs.unlink(filePath, () => {});
+          }
+        }
+      }
+    }
+  }
+};
+purgeExpired();
+setInterval(purgeExpired, 24 * 60 * 60 * 1000); // daily
 
 server.listen(PORT, () => {
   const settings = db.getSettings();

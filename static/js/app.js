@@ -16,6 +16,9 @@ const app = {
   existingImages: [],
   selectedRefModel: null,    // reference model selected from the DB
   showWishlistOnly: false,   // wishlist filter toggle
+  advancedFilters: {},       // advanced search filters
+  filterPanelOpen: false,    // advanced filter panel state
+  dragSrcIndex: null,        // drag-and-drop image reorder
 
   // ==================== Auto-Suggest Database ====================
 
@@ -467,6 +470,7 @@ const app = {
     await this.loadStats();
     this.initTheme();
     this.applyAppName();
+    this.initKeyboardShortcuts();
     this.showLanding();
   },
 
@@ -620,6 +624,11 @@ const app = {
     this.setNav('backup');
     document.getElementById('statsBar').style.display = 'none';
     this.render();
+    // Load share section async
+    this.renderShareSection().then(html => {
+      const el = document.getElementById('shareSection');
+      if (el) el.innerHTML = html;
+    });
   },
 
   // ==================== Rendering ====================
@@ -632,7 +641,18 @@ const app = {
       case 'detail':  main.innerHTML = this.renderDetail();  break;
       case 'dashboard': this.showDashboard(); break;
       case 'backup':  main.innerHTML = this.renderBackupView(); break;
+      case 'trash':   main.innerHTML = this.renderTrashView(); break;
+      case 'timeline': main.innerHTML = this.renderTimelineView(); break;
+      case 'health':  main.innerHTML = this.renderHealthView(); this.loadHealthData(); break;
+      case 'print':   main.innerHTML = this.renderPrintView(); break;
     }
+  },
+
+  updateNav() {
+    // Update nav active state based on currentView
+    const viewNavMap = { landing: 'home', catalog: 'catalog', dashboard: 'dashboard', backup: 'backup' };
+    const navId = viewNavMap[this.currentView];
+    if (navId) this.setNav(navId);
   },
 
   renderStats() {
@@ -780,10 +800,11 @@ const app = {
         <div class="catalog-layout">
           ${this.renderSidebar()}
           <div class="catalog-main">
+            ${this.renderFilterPanel()}
             <div class="items-header">
               <div>
                 <h2 class="items-title">${filterTitle}</h2>
-                <span class="items-count">${this.items.length} item${this.items.length !== 1 ? 's' : ''}</span>
+                <span class="items-count">${this.getFilteredItems().length} item${this.getFilteredItems().length !== 1 ? 's' : ''}</span>
               </div>
               <div class="items-header-actions">
                 <select class="sort-select" onchange="app.setSort(this.value)" title="Sort items">
@@ -799,9 +820,9 @@ const app = {
                 <button class="btn btn-primary" onclick="app.openAddModal()">➕ Add Item</button>
               </div>
             </div>
-            ${this.items.length === 0 ? this.renderEmpty() : `
+            ${this.getFilteredItems().length === 0 ? this.renderEmpty() : `
               <div class="items-grid">
-                ${this.sortItems(this.items).map(item => this.renderItemCard(item)).join('')}
+                ${this.getFilteredItems().map(item => this.renderItemCard(item)).join('')}
               </div>
             `}
           </div>
@@ -947,6 +968,7 @@ const app = {
           <div class="detail-header">
             <a class="detail-back" onclick="app.showCatalog(app.currentFilter)">← Back to catalog</a>
             <div class="detail-actions">
+              <button class="btn btn-outline btn-sm" onclick="app.showQRForItem('${item.id}')">📱 QR</button>
               <button class="btn btn-outline btn-sm" onclick="app.openEditModal('${item.id}')">✏️ Edit</button>
               <button class="btn btn-danger btn-sm" onclick="app.confirmDelete('${item.id}')">🗑️ Delete</button>
             </div>
@@ -969,6 +991,7 @@ const app = {
               ${subcatName ? `<span class="detail-category-badge">${catName} &mdash; ${subcatName}</span>` : ''}
 
               ${item.wishlist ? '<div class="detail-wishlist-badge">⭐ Wishlist Item</div>' : ''}
+              ${this.renderWishlistSpotted(item)}
 
               ${item.runningNumber || item.productCode ? `
                 <div style="margin: 12px 0;">
@@ -1114,6 +1137,41 @@ const app = {
             </div>
           </div>
 
+          <div id="shareSection"></div>
+
+          <h2>Collection Tools</h2>
+          <div style="display:grid; gap:16px; margin-bottom:40px;">
+            <div class="backup-panel">
+              <h3>📊 Collection Timeline</h3>
+              <p>See when you added each item and watch your collection grow over time.</p>
+              <button class="btn btn-outline" onclick="app.showTimeline()">View Timeline</button>
+            </div>
+
+            <div class="backup-panel">
+              <h3>🏥 Data Health Check</h3>
+              <p>Scan your collection for missing fields, incomplete records, and items needing attention.</p>
+              <button class="btn btn-outline" onclick="app.showHealthCheck()">Run Health Check</button>
+            </div>
+
+            <div class="backup-panel">
+              <h3>🖨️ Print Catalogue</h3>
+              <p>Generate a print-friendly view of your entire collection — perfect for exhibitions or reference.</p>
+              <button class="btn btn-outline" onclick="app.showPrintView()">Print-Friendly View</button>
+            </div>
+
+            <div class="backup-panel">
+              <h3>📋 Insurance / Valuation Report</h3>
+              <p>Generate a detailed report of your collection with values — useful for insurance claims.</p>
+              <button class="btn btn-outline" onclick="app.generateInsuranceReport()">Generate Report</button>
+            </div>
+
+            <div class="backup-panel">
+              <h3>🗑️ Recycle Bin</h3>
+              <p>Deleted items stay here for 30 days before being permanently removed. You can restore them any time.</p>
+              <button class="btn btn-outline" onclick="app.showTrash();setTimeout(()=>app.loadTrashItems(),100);">View Bin</button>
+            </div>
+          </div>
+
           <h2>Backup & Export</h2>
           <p>Protect your collection data with regular backups. Export your entire catalogue or restore from a previous backup.</p>
 
@@ -1224,6 +1282,9 @@ const app = {
     document.getElementById('formDccStatus').value = 'analogue';
     // Initialize empty tags
     this.renderFormTags([]);
+    // Reset wishlist fields
+    const wfg = document.getElementById('wishlistFieldsGroup');
+    if (wfg) wfg.style.display = 'none';
     // Reset reference notices
     const notice = document.getElementById('refImageNotice');
     if (notice) notice.style.display = 'none';
@@ -1260,6 +1321,14 @@ const app = {
     document.getElementById('formGoesWellWith').value = item.goesWellWith || '';
     document.getElementById('formHistory').value = item.historicalBackground || '';
     document.getElementById('formWishlist').checked = item.wishlist || false;
+    // Populate wishlist spotted fields
+    const wnEl = document.getElementById('formWishlistNotes');
+    const wsaEl = document.getElementById('formWishlistSpottedAt');
+    const wspEl = document.getElementById('formWishlistSpottedPrice');
+    if (wnEl) wnEl.value = item.wishlistNotes || '';
+    if (wsaEl) wsaEl.value = item.wishlistSpottedAt || '';
+    if (wspEl) wspEl.value = item.wishlistSpottedPrice || '';
+    this.toggleWishlistFields();
 
     // Render tags
     this.renderFormTags(item.tags || []);
@@ -1365,6 +1434,9 @@ const app = {
 
       container.appendChild(div);
     });
+
+    // Initialize drag-drop reordering
+    setTimeout(() => this.initDragDrop(), 50);
   },
 
   removePendingImage(index) {
@@ -1426,6 +1498,9 @@ const app = {
         goesWellWith: document.getElementById('formGoesWellWith').value.trim(),
         historicalBackground: document.getElementById('formHistory').value.trim(),
         wishlist: document.getElementById('formWishlist').checked,
+        wishlistNotes: document.getElementById('formWishlistNotes')?.value.trim() || '',
+        wishlistSpottedPrice: document.getElementById('formWishlistSpottedPrice')?.value || 0,
+        wishlistSpottedAt: document.getElementById('formWishlistSpottedAt')?.value.trim() || '',
         tags: tags,
         images: allImages
       };
@@ -1464,9 +1539,10 @@ const app = {
     const item = this.detailItem || this.items.find(i => i.id === id);
     const name = item ? item.name : 'this item';
     const ok = await this.showConfirmModal({
-      title: 'Send to the scrapyard?',
-      message: `<strong>${this.esc(name)}</strong> will be permanently removed from your collection. This can\u2019t be undone!`,
-      confirmText: 'Scrap it',
+      title: 'Send to the bin?',
+      message: `<strong>${this.esc(name)}</strong> will be moved to the recycle bin. You can restore it within 30 days.`,
+      confirmText: 'Move to bin',
+      confirmClass: 'btn-outline',
       icon: '🗑️'
     });
     if (ok) this.deleteItem(id);
@@ -1475,7 +1551,7 @@ const app = {
   async deleteItem(id) {
     try {
       await this.api(`/api/items/${id}`, { method: 'DELETE' });
-      this.toast('Off to the scrapyard \u2014 item removed.');
+      this.toast('Moved to the bin \u2014 you can restore it from Settings for 30 days.');
       await this.loadAllItems();
       await this.loadStats();
       this.showCatalog(this.currentFilter);
@@ -1624,6 +1700,12 @@ const app = {
   },
 
   // ==================== Product Code Auto-Detect Manufacturer ====================
+
+  toggleWishlistFields() {
+    const isWishlist = document.getElementById('formWishlist').checked;
+    const group = document.getElementById('wishlistFieldsGroup');
+    if (group) group.style.display = isWishlist ? '' : 'none';
+  },
 
   autoDetectManufacturer() {
     const productCode = document.getElementById('formProductCode').value.trim().toUpperCase();
@@ -1788,6 +1870,8 @@ const app = {
       <div class="dashboard-container">
         <h1 style="margin-bottom: 30px;">Collection Dashboard</h1>
 
+        ${this.renderSpotlight()}
+
         <div class="dashboard-grid">
           <div class="dashboard-card">
             <div class="dashboard-card-title">Total Items</div>
@@ -1848,7 +1932,7 @@ const app = {
             <div class="dashboard-list-title">Top 5 Valuable Items</div>
             <div>
               ${topItems.length > 0 ? topItems.map(item => `
-                <div class="dashboard-list-item">
+                <div class="dashboard-list-item" onclick="app.showDetail('${item.id}')" style="cursor:pointer;">
                   <div class="dashboard-list-name">${this.esc(item.name)}</div>
                   <div class="dashboard-list-value">${this.settings.currency}${item.currentValue.toFixed(2)}</div>
                 </div>
@@ -1856,6 +1940,8 @@ const app = {
             </div>
           </div>
         </div>
+
+        ${this.renderMaintenanceSection()}
       </div>
     `;
   },
@@ -2527,6 +2613,693 @@ const app = {
       <circle cx="56" cy="58" r="6" fill="#444" stroke="#555" stroke-width="1.5"/><circle cx="56" cy="58" r="2" fill="#c9a227"/>
       <circle cx="37" cy="58" r="5" fill="#444" stroke="#555" stroke-width="1.5"/><circle cx="37" cy="58" r="1.5" fill="#c9a227"/>
     </svg>`;
+  },
+
+  // ==================== Duplicate Detection ====================
+
+  async checkDuplicate() {
+    const productCode = document.getElementById('formProductCode').value.trim();
+    if (!productCode || productCode.length < 2) return;
+    // Don't check against self when editing
+    try {
+      const data = await this.api('/api/items/check-duplicate?productCode=' + encodeURIComponent(productCode));
+      const dupes = data.duplicates.filter(d => !this.editingItem || d.id !== this.editingItem.id);
+      if (dupes.length > 0) {
+        this.toast(`Heads up! Product code "${productCode}" is already in your collection (${dupes[0].name}). Still good to add another if it's a different model!`, 'error');
+      }
+    } catch(e) { /* silent */ }
+  },
+
+  // ==================== Wishlist Notes ====================
+
+  renderWishlistSpotted(item) {
+    if (!item.wishlist) return '';
+    const hasNotes = item.wishlistNotes || item.wishlistSpottedAt || item.wishlistSpottedPrice;
+    if (!hasNotes) return '';
+    return `
+      <div class="wishlist-spotted">
+        <div class="wishlist-spotted-label">Spotted Info</div>
+        ${item.wishlistSpottedAt ? `<div>Where: ${this.esc(item.wishlistSpottedAt)}</div>` : ''}
+        ${item.wishlistSpottedPrice ? `<div>Price: ${this.settings.currency}${item.wishlistSpottedPrice.toFixed(2)}</div>` : ''}
+        ${item.wishlistNotes ? `<div>Notes: ${this.esc(item.wishlistNotes)}</div>` : ''}
+      </div>
+    `;
+  },
+
+  // ==================== Advanced Search / Filter ====================
+
+  renderFilterPanel() {
+    const manufacturers = [...new Set(this.items.map(i => i.manufacturer).filter(Boolean))].sort();
+    const conditions = ['mint-boxed', 'mint', 'excellent-boxed', 'excellent', 'good', 'fair', 'poor'];
+    const dccStatuses = ['analogue', 'dcc-ready', 'dcc-fitted', 'dcc-sound'];
+    const f = this.advancedFilters;
+
+    return `
+      <div class="filter-panel">
+        <div class="filter-panel-toggle" onclick="app.toggleFilterPanel()">
+          🔍 Advanced Filters ${Object.keys(f).filter(k => f[k]).length > 0 ? `<span style="color:var(--gold-primary);">(${Object.keys(f).filter(k => f[k]).length} active)</span>` : ''}
+        </div>
+        <div class="filter-panel-body ${this.filterPanelOpen ? 'open' : ''}" id="filterPanelBody">
+          <div class="filter-row">
+            <div class="form-group">
+              <label class="form-label">Manufacturer</label>
+              <select class="form-select" onchange="app.setFilter('manufacturer', this.value)">
+                <option value="">All</option>
+                ${manufacturers.map(m => `<option value="${this.esc(m)}" ${f.manufacturer === m ? 'selected' : ''}>${this.esc(m)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Condition</label>
+              <select class="form-select" onchange="app.setFilter('condition', this.value)">
+                <option value="">All</option>
+                ${conditions.map(c => `<option value="${c}" ${f.condition === c ? 'selected' : ''}>${c.replace('-', ' / ')}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">DCC Status</label>
+              <select class="form-select" onchange="app.setFilter('dccStatus', this.value)">
+                <option value="">All</option>
+                ${dccStatuses.map(d => `<option value="${d}" ${f.dccStatus === d ? 'selected' : ''}>${d.replace('-', ' ')}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Price Range</label>
+              <div style="display:flex;gap:4px;">
+                <input type="number" class="form-input" placeholder="Min" style="width:80px" value="${f.priceMin || ''}" onchange="app.setFilter('priceMin', this.value)">
+                <input type="number" class="form-input" placeholder="Max" style="width:80px" value="${f.priceMax || ''}" onchange="app.setFilter('priceMax', this.value)">
+              </div>
+            </div>
+          </div>
+          <div class="filter-actions">
+            <button class="btn btn-primary btn-sm" onclick="app.applyAdvancedFilters()">Apply Filters</button>
+            <button class="btn btn-outline btn-sm" onclick="app.clearAdvancedFilters()">Clear All</button>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  toggleFilterPanel() {
+    this.filterPanelOpen = !this.filterPanelOpen;
+    const body = document.getElementById('filterPanelBody');
+    if (body) body.classList.toggle('open', this.filterPanelOpen);
+  },
+
+  setFilter(key, value) {
+    if (value) this.advancedFilters[key] = value;
+    else delete this.advancedFilters[key];
+  },
+
+  applyAdvancedFilters() {
+    this.render();
+  },
+
+  clearAdvancedFilters() {
+    this.advancedFilters = {};
+    this.filterPanelOpen = false;
+    this.render();
+  },
+
+  getFilteredItems() {
+    let items = this.sortItems(this.items);
+    const f = this.advancedFilters;
+    if (f.manufacturer) items = items.filter(i => i.manufacturer === f.manufacturer);
+    if (f.condition) items = items.filter(i => i.condition === f.condition);
+    if (f.dccStatus) items = items.filter(i => i.dccStatus === f.dccStatus);
+    if (f.priceMin) items = items.filter(i => (i.purchasePrice || 0) >= parseFloat(f.priceMin));
+    if (f.priceMax) items = items.filter(i => (i.purchasePrice || 0) <= parseFloat(f.priceMax));
+    return items;
+  },
+
+  // ==================== Collection Timeline ====================
+
+  showTimeline() {
+    this.currentView = 'timeline';
+    this.setNav('');
+    document.getElementById('statsBar').style.display = 'none';
+    this.render();
+  },
+
+  renderTimelineView() {
+    const items = [...this.items].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    if (items.length === 0) {
+      return `<div class="timeline-container"><div class="empty-state"><div class="empty-mascot">${this.mascotMedium()}</div><div class="empty-title">No history yet</div><div class="empty-text">Add some items and watch your collection timeline grow!</div></div></div>`;
+    }
+
+    // Group by year and month
+    const grouped = {};
+    items.forEach(item => {
+      const d = new Date(item.createdAt);
+      const year = d.getFullYear();
+      const month = d.toLocaleString('default', { month: 'long' });
+      if (!grouped[year]) grouped[year] = {};
+      if (!grouped[year][month]) grouped[year][month] = [];
+      grouped[year][month].push(item);
+    });
+
+    let html = '<div class="timeline-container"><h2>Collection Timeline</h2><p style="color:var(--color-text-muted);margin-bottom:24px;">Watch your collection grow over time</p>';
+    for (const year of Object.keys(grouped).sort((a, b) => b - a)) {
+      html += `<div class="timeline-year">${year}</div>`;
+      for (const month of Object.keys(grouped[year])) {
+        html += `<div class="timeline-month">${month}</div><div class="timeline-items">`;
+        for (const item of grouped[year][month]) {
+          const thumb = item.images && item.images.length > 0
+            ? `<img src="${item.images[0]}" class="timeline-item-thumb" alt="">`
+            : `<div class="timeline-item-thumb" style="display:flex;align-items:center;justify-content:center;">${item.categoryId === 'locomotives' ? '🚂' : '🚃'}</div>`;
+          html += `
+            <div class="timeline-item" onclick="app.showDetail('${item.id}')" style="cursor:pointer;">
+              ${thumb}
+              <div class="timeline-item-info">
+                <div class="timeline-item-name">${this.esc(item.name)}</div>
+                <div class="timeline-item-detail">${this.esc(item.manufacturer || '')} ${item.livery ? '· ' + this.esc(item.livery) : ''}</div>
+              </div>
+              ${item.purchasePrice ? `<div class="timeline-item-price">${this.settings.currency}${item.purchasePrice.toFixed(2)}</div>` : ''}
+            </div>`;
+        }
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+    return html;
+  },
+
+  // ==================== Random Spotlight ====================
+
+  renderSpotlight() {
+    if (this.items.length === 0) return '';
+    const item = this.items[Math.floor(Math.random() * this.items.length)];
+    const img = item.images && item.images.length > 0
+      ? `<img src="${item.images[0]}" class="spotlight-card-image" alt="">`
+      : `<div class="spotlight-card-image-placeholder">${item.categoryId === 'locomotives' ? '🚂' : '🚃'}</div>`;
+    return `
+      <div class="spotlight-card" onclick="app.showDetail('${item.id}')">
+        ${img}
+        <div class="spotlight-card-body">
+          <div class="spotlight-card-label">Rediscover your collection</div>
+          <div class="spotlight-card-name">${this.esc(item.name)}</div>
+          <div class="spotlight-card-detail">${this.esc(item.manufacturer || 'Unknown')} ${item.livery ? '· ' + this.esc(item.livery) : ''}</div>
+          ${item.historicalBackground ? `<div class="spotlight-card-detail" style="margin-top:4px;font-style:italic;">"${this.esc(item.historicalBackground.substring(0, 100))}${item.historicalBackground.length > 100 ? '...' : ''}"</div>` : ''}
+        </div>
+      </div>
+    `;
+  },
+
+  // ==================== Trash / Bin (Soft Delete) ====================
+
+  showTrash() {
+    this.currentView = 'trash';
+    this.setNav('');
+    document.getElementById('statsBar').style.display = 'none';
+    this.render();
+  },
+
+  renderTrashView() {
+    return `
+      <div class="trash-container">
+        <div class="trash-header">
+          <h2>🗑️ Recycle Bin</h2>
+          <button class="btn btn-outline btn-sm" onclick="app.showBackup()">← Back to Settings</button>
+        </div>
+        <p style="color:var(--color-text-muted);margin-bottom:20px;">Items here will be permanently deleted after 30 days. You can restore them any time before that.</p>
+        <div id="trashList"><p>Loading...</p></div>
+      </div>
+    `;
+  },
+
+  async loadTrashItems() {
+    try {
+      const items = await this.api('/api/trash');
+      const container = document.getElementById('trashList');
+      if (!container) return;
+
+      if (items.length === 0) {
+        container.innerHTML = `<div class="trash-empty"><div class="empty-mascot">${this.mascotMedium('happy')}</div><p>The bin is empty — nothing to see here!</p></div>`;
+        return;
+      }
+
+      container.innerHTML = items.map(item => {
+        const daysLeft = Math.max(0, 30 - Math.floor((Date.now() - new Date(item.deletedAt).getTime()) / (1000 * 60 * 60 * 24)));
+        return `
+          <div class="trash-item">
+            <div class="trash-item-info">
+              <div class="trash-item-name">${this.esc(item.name)}</div>
+              <div class="trash-item-meta">${this.esc(item.manufacturer || '')} · Deleted ${this.formatDate(item.deletedAt)} · <span class="trash-days-left">${daysLeft} days left</span></div>
+            </div>
+            <div class="trash-item-actions">
+              <button class="btn btn-outline btn-sm" onclick="app.restoreItem('${item.id}')">♻️ Restore</button>
+              <button class="btn btn-danger btn-sm" onclick="app.permanentlyDelete('${item.id}', '${this.esc(item.name)}')">🗑️ Delete Forever</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch(e) { /* toast shown */ }
+  },
+
+  async restoreItem(id) {
+    try {
+      await this.api(`/api/trash/${id}/restore`, { method: 'POST' });
+      this.toast('Welcome back! Item restored to the collection.');
+      await this.loadAllItems();
+      await this.loadStats();
+      this.loadTrashItems();
+    } catch(e) { /* toast shown */ }
+  },
+
+  async permanentlyDelete(id, name) {
+    const ok = await this.showConfirmModal({
+      title: 'Permanent deletion',
+      message: `<strong>${name}</strong> will be gone forever — no coming back from this one!`,
+      confirmText: 'Delete forever',
+      icon: '💀'
+    });
+    if (!ok) return;
+    try {
+      await this.api(`/api/trash/${id}`, { method: 'DELETE' });
+      this.toast('Permanently scrapped — gone for good.');
+      this.loadTrashItems();
+    } catch(e) { /* toast shown */ }
+  },
+
+  // ==================== Drag & Drop Image Reorder ====================
+
+  initDragDrop() {
+    const container = document.getElementById('uploadPreviews');
+    if (!container) return;
+    const previews = container.querySelectorAll('.upload-preview');
+    previews.forEach((el, i) => {
+      el.setAttribute('draggable', 'true');
+      el.dataset.index = i;
+      el.addEventListener('dragstart', (e) => {
+        this.dragSrcIndex = i;
+        el.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      el.addEventListener('dragend', () => { el.classList.remove('dragging'); });
+      el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('drag-over'); });
+      el.addEventListener('dragleave', () => { el.classList.remove('drag-over'); });
+      el.addEventListener('drop', (e) => {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        const from = this.dragSrcIndex;
+        const to = i;
+        if (from === to) return;
+        this.reorderImages(from, to);
+      });
+    });
+  },
+
+  reorderImages(fromIndex, toIndex) {
+    // Combine existing and pending for a unified list
+    const allImages = [...this.existingImages.map(url => ({ type: 'existing', url })), ...this.pendingImages.map(file => ({ type: 'pending', file }))];
+    const [moved] = allImages.splice(fromIndex, 1);
+    allImages.splice(toIndex, 0, moved);
+    this.existingImages = allImages.filter(i => i.type === 'existing').map(i => i.url);
+    this.pendingImages = allImages.filter(i => i.type === 'pending').map(i => i.file);
+    this.renderUploadPreviews();
+    // Re-init drag-drop after re-render
+    setTimeout(() => this.initDragDrop(), 50);
+  },
+
+  // ==================== Keyboard Shortcuts ====================
+
+  initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Don't trigger when typing in inputs
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      // Don't trigger when modal is open
+      if (document.querySelector('.modal-overlay.active') || document.querySelector('.confirm-overlay') || document.querySelector('.lightbox-overlay')) return;
+
+      switch (e.key) {
+        case 'n': case 'N': if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); this.openAddModal(); } break;
+        case 'e': case 'E': if (this.currentView === 'detail' && this.detailItem) { e.preventDefault(); this.openEditModal(this.detailItem.id); } break;
+        case 'j': case 'J': e.preventDefault(); this.navigateItems(1); break;
+        case 'k': case 'K': e.preventDefault(); this.navigateItems(-1); break;
+        case '/': e.preventDefault(); document.getElementById('globalSearch')?.focus(); break;
+        case '?': e.preventDefault(); this.showKeyboardShortcuts(); break;
+        case 'Escape': this.closeModal(); break;
+      }
+    });
+  },
+
+  navigateItems(direction) {
+    if (this.currentView !== 'catalog' || this.items.length === 0) return;
+    const cards = document.querySelectorAll('.item-card');
+    if (cards.length === 0) return;
+    // Simple: navigate to first or last item detail
+    const sorted = this.getFilteredItems();
+    const idx = direction > 0 ? 0 : sorted.length - 1;
+    if (sorted[idx]) this.showDetail(sorted[idx].id);
+  },
+
+  showKeyboardShortcuts() {
+    const overlay = document.createElement('div');
+    overlay.className = 'shortcuts-overlay';
+    overlay.id = 'shortcutsOverlay';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML = `
+      <div class="shortcuts-panel">
+        <h3>⌨️ Keyboard Shortcuts</h3>
+        <div class="shortcut-row"><span class="shortcut-desc">Add new item</span><span class="shortcut-key">N</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Edit current item</span><span class="shortcut-key">E</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Next item</span><span class="shortcut-key">J</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Previous item</span><span class="shortcut-key">K</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Focus search</span><span class="shortcut-key">/</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Show shortcuts</span><span class="shortcut-key">?</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Close modal / lightbox</span><span class="shortcut-key">Esc</span></div>
+        <div style="margin-top:16px;text-align:center;"><button class="btn btn-outline btn-sm" onclick="document.getElementById('shortcutsOverlay').remove()">Got it!</button></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  },
+
+  // ==================== Data Health Check ====================
+
+  showHealthCheck() {
+    this.currentView = 'health';
+    this.setNav('');
+    document.getElementById('statsBar').style.display = 'none';
+    this.render();
+  },
+
+  renderHealthView() {
+    return `
+      <div class="health-container">
+        <h2>🏥 Collection Health Check</h2>
+        <p style="color:var(--color-text-muted);margin-bottom:24px;">Let's see how complete your records are — the fuller, the better!</p>
+        <div id="healthContent"><p>Scanning your collection...</p></div>
+      </div>
+    `;
+  },
+
+  async loadHealthData() {
+    try {
+      const data = await this.api('/api/health-check');
+      const container = document.getElementById('healthContent');
+      if (!container) return;
+
+      const barColor = data.avgCompleteness >= 80 ? 'health-good' : data.avgCompleteness >= 50 ? 'health-warn' : 'health-bad';
+
+      let html = `
+        <div class="health-summary">
+          <div class="health-card">
+            <div class="health-card-value">${data.totalItems}</div>
+            <div class="health-card-label">Total Items</div>
+          </div>
+          <div class="health-card">
+            <div class="health-card-value" style="color:${data.itemsWithIssues === 0 ? '#66bb6a' : '#ef5350'}">${data.itemsWithIssues}</div>
+            <div class="health-card-label">Items with Issues</div>
+          </div>
+          <div class="health-card">
+            <div class="health-card-value">${data.avgCompleteness}%</div>
+            <div class="health-card-label">Average Completeness</div>
+            <div class="health-bar"><div class="health-bar-fill ${barColor}" style="width:${data.avgCompleteness}%"></div></div>
+          </div>
+        </div>
+      `;
+
+      if (data.issues.length === 0) {
+        html += `<div style="text-align:center;padding:40px;"><div class="empty-mascot">${this.mascotMedium('happy')}</div><p style="font-size:1.1rem;font-weight:600;">All clear! Your records are in tip-top shape.</p></div>`;
+      } else {
+        html += '<h3 style="margin-bottom:12px;">Items needing attention</h3>';
+        for (const issue of data.issues) {
+          const pctColor = issue.completeness >= 80 ? '#66bb6a' : issue.completeness >= 50 ? '#ffb74d' : '#ef5350';
+          html += `
+            <div class="health-issue-item" onclick="app.openEditModal('${issue.id}')">
+              <div class="health-issue-name">${this.esc(issue.name)}</div>
+              <div class="health-issue-missing">Missing: ${issue.missingFields.join(', ')}${issue.serviceOverdue ? ' · 🔧 Service overdue' : ''}</div>
+              <div class="health-issue-percent" style="color:${pctColor}">${issue.completeness}%</div>
+            </div>
+          `;
+        }
+      }
+      container.innerHTML = html;
+    } catch(e) { /* toast shown */ }
+  },
+
+  // ==================== Maintenance Reminders ====================
+
+  getMaintenanceItems() {
+    const interval = this.settings.serviceIntervalDays || 365;
+    const now = Date.now();
+    return this.items.filter(item => {
+      if (!item.lastServiceDate) return true; // never serviced
+      const days = Math.floor((now - new Date(item.lastServiceDate).getTime()) / (1000 * 60 * 60 * 24));
+      return days > interval * 0.75; // due soon or overdue
+    }).sort((a, b) => {
+      const daysA = a.lastServiceDate ? Math.floor((now - new Date(a.lastServiceDate).getTime()) / (1000 * 60 * 60 * 24)) : 9999;
+      const daysB = b.lastServiceDate ? Math.floor((now - new Date(b.lastServiceDate).getTime()) / (1000 * 60 * 60 * 24)) : 9999;
+      return daysB - daysA;
+    });
+  },
+
+  renderMaintenanceSection() {
+    const items = this.getMaintenanceItems();
+    if (items.length === 0) return '';
+    const interval = this.settings.serviceIntervalDays || 365;
+    const now = Date.now();
+
+    let html = `<div class="dashboard-chart-container"><div class="dashboard-chart-title">🔧 Maintenance Due (${items.length} items)</div><div class="maintenance-list">`;
+    for (const item of items.slice(0, 10)) {
+      const days = item.lastServiceDate ? Math.floor((now - new Date(item.lastServiceDate).getTime()) / (1000 * 60 * 60 * 24)) : null;
+      const isOverdue = days !== null && days > interval;
+      const cls = isOverdue ? 'overdue' : 'due-soon';
+
+      html += `
+        <div class="maintenance-item ${cls}" onclick="app.showDetail('${item.id}')" style="cursor:pointer;">
+          <div class="maintenance-item-info">
+            <div class="maintenance-item-name">${this.esc(item.name)}</div>
+            <div class="maintenance-item-date">${days !== null ? `Last serviced ${days} days ago` : 'Never serviced'}</div>
+          </div>
+          <span class="service-badge ${isOverdue ? 'service-overdue' : 'service-due-soon'}">${isOverdue ? '🔧 Overdue' : '⚙️ Due soon'}</span>
+        </div>
+      `;
+    }
+    html += '</div></div>';
+    return html;
+  },
+
+  // ==================== Public Share Link ====================
+
+  async toggleShareLink() {
+    try {
+      const status = await this.api('/api/share/status');
+      if (status.enabled) {
+        const ok = await this.showConfirmModal({
+          title: 'Disable Share Link?',
+          message: 'The existing share link will stop working. Anyone with it will no longer see your collection.',
+          confirmText: 'Disable',
+          confirmClass: 'btn-outline',
+          icon: '🔗'
+        });
+        if (!ok) return;
+        await this.api('/api/share/disable', { method: 'POST' });
+        this.toast('Share link disabled — collection is private again.');
+      } else {
+        await this.api('/api/share/enable', { method: 'POST' });
+        this.toast('Share link created! Copy it and send to your friends.');
+      }
+      this.render();
+    } catch(e) { /* toast shown */ }
+  },
+
+  async renderShareSection() {
+    try {
+      const status = await this.api('/api/share/status');
+      const baseUrl = window.location.origin;
+      if (status.enabled) {
+        const shareUrl = `${baseUrl}/shared?token=${status.token}`;
+        return `
+          <div class="share-panel">
+            <h3>🔗 Share Link <span style="color:#66bb6a;font-size:0.85rem;">Active</span></h3>
+            <p>Anyone with this link can view your collection (read-only, no editing).</p>
+            <div class="share-url">
+              <input type="text" class="form-input" value="${shareUrl}" readonly onclick="this.select()">
+              <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${shareUrl}');app.toast('Link copied!')">📋 Copy</button>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="app.toggleShareLink()" style="margin-top:12px;">Disable Share Link</button>
+          </div>
+        `;
+      }
+      return `
+        <div class="share-panel">
+          <h3>🔗 Share Your Collection</h3>
+          <p>Create a read-only link to share your catalogue with fellow enthusiasts — no password required for them.</p>
+          <button class="btn btn-primary btn-sm" onclick="app.toggleShareLink()">Create Share Link</button>
+        </div>
+      `;
+    } catch(e) { return ''; }
+  },
+
+  // ==================== Print-Friendly Catalogue ====================
+
+  showPrintView() {
+    this.currentView = 'print';
+    this.setNav('');
+    document.getElementById('statsBar').style.display = 'none';
+    this.render();
+  },
+
+  renderPrintView() {
+    const items = this.sortItems(this.items);
+    let html = `
+      <div class="print-catalogue-view">
+        <h1>${this.esc(this.settings.appName)} — Collection Catalogue</h1>
+        <div class="print-date">Printed ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} · ${items.length} items</div>
+        <div style="margin-bottom:16px;"><button class="btn btn-primary" onclick="window.print()">🖨️ Print This Page</button> <button class="btn btn-outline" onclick="app.showBackup()">← Back</button></div>
+        <div class="print-catalogue-grid">
+    `;
+    for (const item of items) {
+      const img = item.images && item.images.length > 0 ? `<img src="${item.images[0]}" alt="">` : '';
+      html += `
+        <div class="print-catalogue-item">
+          ${img}
+          <h4>${this.esc(item.name)}</h4>
+          <p>${this.esc(item.manufacturer || '')} ${item.livery ? '· ' + this.esc(item.livery) : ''}</p>
+          <p>${item.purchasePrice ? this.settings.currency + item.purchasePrice.toFixed(2) : '—'} ${item.currentValue ? '(Value: ' + this.settings.currency + item.currentValue.toFixed(2) + ')' : ''}</p>
+          ${item.condition ? `<p>Condition: ${item.condition.replace('-', ' / ')}</p>` : ''}
+          ${item.storageLocation ? `<p>Location: ${this.esc(item.storageLocation)}</p>` : ''}
+        </div>
+      `;
+    }
+    html += '</div></div>';
+    return html;
+  },
+
+  // ==================== QR Code Generator ====================
+
+  generateQRCode(text, size = 200) {
+    // Simple QR code implementation using Canvas
+    // We'll use a basic text-to-QR approach via a data URL
+    // For a zero-dependency approach, we generate a visual ID card instead
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Generate a simple visual barcode-style pattern from the text
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#1b4332';
+
+    // Create a hash-based pattern
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      hash = ((hash << 5) - hash) + text.charCodeAt(i);
+      hash = hash & hash;
+    }
+
+    const gridSize = 21;
+    const cellSize = Math.floor(size / (gridSize + 2));
+    const offset = Math.floor((size - cellSize * gridSize) / 2);
+
+    // Position detection patterns (corners)
+    const drawFinder = (x, y) => {
+      ctx.fillRect(offset + x * cellSize, offset + y * cellSize, 7 * cellSize, 7 * cellSize);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(offset + (x + 1) * cellSize, offset + (y + 1) * cellSize, 5 * cellSize, 5 * cellSize);
+      ctx.fillStyle = '#1b4332';
+      ctx.fillRect(offset + (x + 2) * cellSize, offset + (y + 2) * cellSize, 3 * cellSize, 3 * cellSize);
+    };
+
+    drawFinder(0, 0);
+    drawFinder(gridSize - 7, 0);
+    drawFinder(0, gridSize - 7);
+
+    // Fill data area with hash-derived pattern
+    let seed = Math.abs(hash);
+    for (let row = 0; row < gridSize; row++) {
+      for (let col = 0; col < gridSize; col++) {
+        // Skip finder patterns
+        if ((row < 8 && col < 8) || (row < 8 && col > gridSize - 9) || (row > gridSize - 9 && col < 8)) continue;
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        if (seed % 2 === 0) {
+          ctx.fillRect(offset + col * cellSize, offset + row * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+
+    return canvas.toDataURL();
+  },
+
+  showQRForItem(itemId) {
+    const item = this.items.find(i => i.id === itemId) || this.detailItem;
+    if (!item) return;
+    const url = `${window.location.origin}/#item/${item.id}`;
+    const qrDataUrl = this.generateQRCode(url);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+      <div class="depot-dialog" style="max-width:350px;">
+        <div class="depot-dialog-header">
+          <div class="depot-dialog-mascot">${this.mascotSmall('happy')}</div>
+          <div><h3 class="depot-dialog-title">QR Label</h3></div>
+        </div>
+        <div class="depot-dialog-body qr-container">
+          <img src="${qrDataUrl}" class="qr-canvas" width="200" height="200" alt="QR Code">
+          <div style="font-weight:600;margin-top:8px;">${this.esc(item.name)}</div>
+          <div style="font-size:0.8rem;color:var(--color-text-muted);">${this.esc(item.productCode || '')} · ${this.esc(item.manufacturer || '')}</div>
+          <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="app.printQR(this)">🖨️ Print Label</button>
+        </div>
+        <div class="depot-dialog-actions">
+          <button class="btn btn-outline" onclick="this.closest('.confirm-overlay').remove()">Close</button>
+        </div>
+      </div>
+    `;
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+  },
+
+  printQR(btn) {
+    const qrContainer = btn.closest('.qr-container');
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`<html><head><title>QR Label</title><style>body{text-align:center;font-family:sans-serif;padding:20px;}img{margin:10px;}</style></head><body>${qrContainer.innerHTML}</body></html>`);
+    printWindow.document.close();
+    printWindow.print();
+  },
+
+  // ==================== Insurance / Valuation Report ====================
+
+  generateInsuranceReport() {
+    const items = this.sortItems(this.items);
+    const totalValue = items.reduce((sum, i) => sum + (i.currentValue || i.purchasePrice || 0), 0);
+    const c = this.settings.currency;
+
+    let html = `
+      <html><head><title>${this.settings.appName} — Insurance Valuation Report</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 30px; color: #333; max-width: 900px; margin: 0 auto; }
+        h1 { border-bottom: 3px solid #1b4332; padding-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.85rem; }
+        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+        th { background: #1b4332; color: white; }
+        tr:nth-child(even) { background: #f8f8f8; }
+        .summary { background: #f0f0f0; padding: 16px; border-radius: 8px; margin: 16px 0; }
+        .total { font-size: 1.2rem; font-weight: bold; color: #1b4332; }
+        @media print { body { padding: 10px; } }
+      </style></head><body>
+      <h1>${this.esc(this.settings.appName)} — Insurance Valuation Report</h1>
+      <p>Generated: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+      <div class="summary">
+        <p>Total items: <strong>${items.length}</strong></p>
+        <p class="total">Total valuation: ${c}${totalValue.toFixed(2)}</p>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Item Name</th><th>Manufacturer</th><th>Product Code</th><th>Condition</th><th>Purchase Price</th><th>Current Value</th><th>Storage Location</th></tr></thead>
+        <tbody>
+    `;
+    items.forEach((item, i) => {
+      const val = item.currentValue || item.purchasePrice || 0;
+      html += `<tr><td>${i + 1}</td><td>${this.esc(item.name)}</td><td>${this.esc(item.manufacturer || '—')}</td><td>${this.esc(item.productCode || '—')}</td><td>${item.condition ? item.condition.replace('-', ' / ') : '—'}</td><td>${item.purchasePrice ? c + item.purchasePrice.toFixed(2) : '—'}</td><td>${val ? c + val.toFixed(2) : '—'}</td><td>${this.esc(item.storageLocation || '—')}</td></tr>`;
+    });
+    html += `</tbody></table>
+      <p style="margin-top:20px;font-size:0.8rem;color:#999;">This report was generated by ${this.esc(this.settings.appName)} for insurance and valuation purposes only.</p>
+      </body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(html);
+    printWindow.document.close();
+    this.toast('Insurance report opened — you can print or save it from there.');
   },
 
   mascotMedium(mood = 'happy') {

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shared Collection — Train Depot</title>
+  <link rel="stylesheet" href="/css/styles.css?v=8">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚂</text></svg>">
+  <style>
+    .shared-banner { background: var(--green-deep); color: white; text-align: center; padding: 12px; font-size: 0.9rem; }
+    .shared-banner a { color: var(--gold-primary); }
+    .shared-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; padding: 20px; max-width: 1200px; margin: 0 auto; }
+    .shared-stats { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding: 20px; }
+    .shared-stat { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px 20px; text-align: center; }
+    .shared-stat-value { font-size: 1.4rem; font-weight: 700; color: var(--green-primary); }
+    .shared-stat-label { font-size: 0.8rem; color: var(--color-text-muted); }
+    .shared-error { text-align: center; padding: 80px 20px; }
+    .shared-error h2 { color: var(--color-text-muted); }
+  </style>
+  <script>
+    (function() {
+      const saved = localStorage.getItem('trainCatalogTheme');
+      if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo"><span class="logo-icon">🚂</span><span id="sharedAppName">Train Depot</span></div>
+      <div class="header-right">
+        <span style="color:var(--gold-primary); font-size:0.85rem;">📖 Read-only shared view</span>
+      </div>
+    </div>
+  </header>
+  <main id="sharedContent">
+    <div style="text-align:center; padding:60px;"><p>Loading collection...</p></div>
+  </main>
+  <footer class="site-footer">Train Depot &copy; 2026 &middot; Shared collection view</footer>
+  <script>
+    (async function() {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      const main = document.getElementById('sharedContent');
+
+      if (!token) {
+        main.innerHTML = '<div class="shared-error"><h2>No share token provided</h2><p>This link appears to be invalid.</p></div>';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/shared?token=' + encodeURIComponent(token));
+        if (!res.ok) throw new Error('Invalid link');
+        const data = await res.json();
+
+        document.getElementById('sharedAppName').textContent = data.settings.appName || 'Train Depot';
+        document.title = (data.settings.appName || 'Train Depot') + ' — Shared Collection';
+        const c = data.settings.currency || '£';
+
+        let html = '<div class="shared-stats">';
+        html += '<div class="shared-stat"><div class="shared-stat-value">' + data.stats.totalItems + '</div><div class="shared-stat-label">Total Items</div></div>';
+        html += '<div class="shared-stat"><div class="shared-stat-value">' + c + data.stats.totalSpent.toFixed(2) + '</div><div class="shared-stat-label">Total Invested</div></div>';
+        html += '<div class="shared-stat"><div class="shared-stat-value">' + data.stats.locomotiveCount + '</div><div class="shared-stat-label">Locomotives</div></div>';
+        html += '<div class="shared-stat"><div class="shared-stat-value">' + data.stats.rollingStockCount + '</div><div class="shared-stat-label">Rolling Stock</div></div>';
+        html += '</div>';
+
+        html += '<div class="shared-grid">';
+        for (const item of data.items) {
+          const img = item.images && item.images.length > 0
+            ? '<img src="' + item.images[0] + '" alt="" loading="lazy" style="width:100%;height:180px;object-fit:cover;">'
+            : '<div style="height:180px;display:flex;align-items:center;justify-content:center;font-size:3rem;background:var(--color-bg);">' + (item.categoryId === 'locomotives' ? '🚂' : '🚃') + '</div>';
+          html += '<div class="item-card" style="cursor:default;">';
+          html += '<div class="item-card-image">' + img + '</div>';
+          html += '<div class="item-card-body">';
+          html += '<div class="item-card-name">' + esc(item.name) + '</div>';
+          html += '<div class="item-card-manufacturer">' + esc(item.manufacturer || '') + '</div>';
+          html += '<div class="item-card-meta">';
+          if (item.livery) html += '<span class="item-card-livery">' + esc(item.livery) + '</span>';
+          if (item.condition) html += '<span class="condition-badge condition-' + item.condition + '">' + item.condition.replace('-', ' / ') + '</span>';
+          html += '</div></div></div>';
+        }
+        html += '</div>';
+        main.innerHTML = html;
+      } catch(e) {
+        main.innerHTML = '<div class="shared-error"><h2>Link expired or invalid</h2><p>This share link is no longer active. Ask the collection owner for a new one.</p></div>';
+      }
+
+      function esc(s) {
+        if (!s) return '';
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      }
+    })();
+  </script>
+</body>
+</html>
