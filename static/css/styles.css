@@ -2192,11 +2192,6 @@ img { max-width: 100%; height: auto; }
   color: var(--color-text);
 }
 
-.dashboard-chart-canvas {
-  width: 100%;
-  display: block;
-}
-
 .dashboard-list {
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
