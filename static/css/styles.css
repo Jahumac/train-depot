@@ -643,6 +643,23 @@ img { max-width: 100%; height: auto; }
   color: var(--color-text-light);
   font-size: 0.85rem;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.item-card-number-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  background: var(--gold-glow, rgba(201, 162, 39, 0.15));
+  color: var(--color-primary);
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: 'Georgia', serif;
+  white-space: nowrap;
 }
 
 .item-card-meta {
@@ -1420,6 +1437,24 @@ img { max-width: 100%; height: auto; }
   padding: 2px 6px;
   border-radius: 12px;
   font-size: 0.75rem;
+}
+
+/* Running number plate — classic brass loco nameplate style */
+.item-card-number {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background: linear-gradient(180deg, #d4a94a 0%, #b8892a 50%, #8a6418 100%);
+  color: #1a1205;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  letter-spacing: 0.5px;
+  border: 1px solid #6b4e12;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.25);
 }
 
 /* Wishlist toggle in form */

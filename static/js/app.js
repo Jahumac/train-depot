@@ -923,10 +923,14 @@ const app = {
           ${img}
           ${subcatName ? `<span class="item-card-badge">${subcatName}</span>` : ''}
           ${item.wishlist ? '<span class="item-card-wishlist-badge">⭐</span>' : ''}
+          ${item.runningNumber ? `<span class="item-card-number">${this.esc(item.runningNumber)}</span>` : ''}
         </div>
         <div class="item-card-body">
           <div class="item-card-name">${this.esc(item.name)}</div>
-          <div class="item-card-manufacturer">${this.esc(item.manufacturer || 'Unknown manufacturer')}</div>
+          <div class="item-card-manufacturer">
+            <span>${this.esc(item.manufacturer || 'Unknown manufacturer')}</span>
+            ${item.runningNumber ? `<span class="item-card-number-chip">№ ${this.esc(item.runningNumber)}</span>` : ''}
+          </div>
           <div class="item-card-meta">
             <span class="item-card-price">${item.purchasePrice ? this.settings.currency + item.purchasePrice.toFixed(2) : '—'}</span>
             ${this.renderValuationBadge(item)}
