@@ -1394,6 +1394,100 @@ img { max-width: 100%; height: auto; }
   .hero-stat-value { font-size: 1.6rem; }
 }
 
+/* === Mobile layout fixes === */
+@media (max-width: 768px) {
+  /* Valuation listings — stack rows vertically so nothing gets truncated */
+  .valuation-listing {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 10px 12px;
+  }
+  .valuation-listing-title {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    width: 100%;
+    line-height: 1.35;
+  }
+  .valuation-listing-price {
+    font-size: 0.95rem;
+  }
+  .valuation-listing-link {
+    padding: 4px 0;  /* bigger tap target */
+  }
+
+  /* Valuation panel header — let title + button wrap if needed */
+  .valuation-panel-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Valuation stats — stack to one-per-row so gain/loss doesn't get chopped */
+  .valuation-stats {
+    gap: 14px;
+  }
+  .valuation-stat {
+    min-width: 45%;
+  }
+
+  /* Detail header — stack actions below the back link */
+  .detail-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+  }
+  .detail-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  /* Modal — less wasted padding, full-width footer buttons */
+  .modal { width: 95%; max-height: 92vh; }
+  .modal-body { padding: 16px; }
+  .modal-header { padding: 14px 16px; }
+  .modal-footer {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+  .modal-footer .btn { flex: 1; min-width: 0; }
+
+  /* Dashboard chart cards — prevent canvas overflow */
+  .dashboard-chart-container { padding: 14px; overflow: hidden; }
+  .dashboard-chart-container canvas { max-width: 100%; height: auto !important; }
+
+  /* Tag chips and goes-well chips — allow wrapping */
+  .tags-container, .goes-well-chips { flex-wrap: wrap; }
+
+  /* Dashboard cards — avoid overflow on narrow phones */
+  .dashboard-cards-grid,
+  .dashboard-cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important; }
+
+  /* Items header actions — wrap buttons */
+  .items-header-actions { flex-wrap: wrap; gap: 8px; }
+}
+
+@media (max-width: 480px) {
+  /* Stack the valuation-stats vertically on very small screens */
+  .valuation-stats { flex-direction: column; gap: 10px; }
+  .valuation-stat { min-width: 100%; }
+
+  /* Header — tighter on phones so logo + controls don't overflow */
+  .nav-search input { width: 100px; }
+  .nav-search input:focus { width: 140px; }
+  .logo { font-size: 1.1rem; }
+  .logo-icon { font-size: 1.3rem; }
+
+  /* Dashboard cards — single column on tiny screens */
+  .dashboard-cards-grid,
+  .dashboard-cards { grid-template-columns: 1fr !important; }
+
+  /* Modal footer buttons — stack full width on very small screens */
+  .modal-footer { flex-direction: column-reverse; }
+  .modal-footer .btn { width: 100%; }
+}
+
 /* --- Print Styles --- */
 @media print {
   * { background: white !important; color: black !important; box-shadow: none !important; text-shadow: none !important; }
