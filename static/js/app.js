@@ -889,20 +889,27 @@ const app = {
           `).join('')}
         </ul>
 
-        ${allTags.length > 0 ? `
-          <div class="catalog-tags-section">
-            <div class="catalog-tags-title">Tags</div>
+        <div class="catalog-tags-section">
+          <div class="catalog-tags-title">🏷️ Filter by Tag</div>
+          ${allTags.length > 0 ? `
             <ul class="catalog-tags-list">
               ${allTags.map(tag => `
                 <li class="catalog-tags-item ${this.currentFilter?.type === 'tag' && this.currentFilter?.value === tag.name ? 'active' : ''}"
                     onclick="app.showCatalog({type:'tag',value:'${this.esc(tag.name)}'})">
-                  <span class="catalog-tags-item-name">${this.esc(tag.name)}</span>
+                  <span class="catalog-tags-item-name">#${this.esc(tag.name)}</span>
                   <span class="catalog-tags-item-count">${tag.count}</span>
                 </li>
               `).join('')}
             </ul>
-          </div>
-        ` : ''}
+            ${this.currentFilter?.type === 'tag' ? `
+              <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;" onclick="app.showCatalog()">✕ Clear tag filter</button>
+            ` : ''}
+          ` : `
+            <p class="catalog-tags-empty">
+              No tags yet. Open any item and add tags like <em>layout-ready</em>, <em>needs-service</em>, or <em>display</em> to group items however you like.
+            </p>
+          `}
+        </div>
 
         <div class="sidebar-actions">
           <button class="btn btn-outline btn-sm" onclick="app.addCategory()" style="width:100%;margin-bottom:8px;">📁 Add Category</button>
@@ -936,6 +943,14 @@ const app = {
             ${this.renderValuationBadge(item)}
             ${!item.valuation && item.currentValue ? `<span class="item-card-value">Val: ${this.settings.currency}${item.currentValue.toFixed(2)}</span>` : ''}
           </div>
+          ${item.tags && item.tags.length > 0 ? `
+            <div class="item-card-tags">
+              ${item.tags.slice(0, 4).map(t => `
+                <span class="item-card-tag" onclick="event.stopPropagation();app.showCatalog({type:'tag',value:'${this.esc(t)}'})">#${this.esc(t)}</span>
+              `).join('')}
+              ${item.tags.length > 4 ? `<span class="item-card-tag-more">+${item.tags.length - 4}</span>` : ''}
+            </div>
+          ` : ''}
           ${this.daysSinceService(item.lastServiceDate) > (this.settings.serviceIntervalDays || 365) ? '<div class="item-card-service-warn">🔧 Service overdue</div>' : ''}
         </div>
       </div>

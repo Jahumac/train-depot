@@ -2415,6 +2415,56 @@ img { max-width: 100%; height: auto; }
   margin-left: 8px;
 }
 
+.catalog-tags-empty {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  padding: 8px 10px;
+  background: var(--color-bg-hover);
+  border-radius: var(--radius-sm);
+}
+.catalog-tags-empty em {
+  font-style: normal;
+  background: var(--gold-glow, rgba(201, 162, 39, 0.15));
+  color: var(--color-primary);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* Tag chips on catalog cards — makes the tag system visible in context */
+.item-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.item-card-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--gold-glow, rgba(201, 162, 39, 0.15));
+  color: var(--color-primary);
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.item-card-tag:hover {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+.item-card-tag-more {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
 /* ==================== v1.3.0 New Features ==================== */
 
 /* --- Trash / Bin View --- */
