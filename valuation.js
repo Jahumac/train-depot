@@ -111,59 +111,88 @@ async function searchEbay(item, config) {
   }
 
   const token = await getOAuthToken(config.appId, config.certId, config.sandbox);
-
-  // Build search query - prioritise product code, fall back to name + manufacturer
-  let query = '';
-  if (item.productCode) {
-    // Product codes like "R3834" or "32-360" are very specific
-    query = item.productCode;
-    // Add manufacturer for better accuracy if available
-    if (item.manufacturer) {
-      query = `${item.manufacturer} ${query}`;
-    }
-  } else {
-    // Fall back to name-based search
-    query = item.name;
-    if (item.manufacturer) {
-      query = `${item.manufacturer} ${query}`;
-    }
-  }
-
-  // Add "OO gauge" to narrow results to the right scale
-  query += ' OO gauge';
-
   const browseUrl = config.sandbox ? EBAY_SANDBOX_BROWSE_URL : EBAY_BROWSE_URL;
 
-  // Search parameters - filter for model trains category and sold items
-  const params = new URLSearchParams({
-    q: query,
-    category_ids: '180293',  // Model Railroads & Trains > OO Gauge
-    filter: 'conditionIds:{1000|1500|2000|2500|3000|4000|5000|6000|7000},' +
-            'buyingOptions:{FIXED_PRICE|AUCTION},' +
-            'priceCurrency:GBP',
-    sort: '-price',  // newest/highest first
-    limit: '20'
-  });
+  // Build a list of progressively broader queries — stop at the first with results.
+  const attempts = buildSearchAttempts(item);
 
-  const searchUrl = `${browseUrl}?${params.toString()}`;
+  let lastData = null;
+  let lastQuery = '';
+  for (const attempt of attempts) {
+    const params = new URLSearchParams({
+      q: attempt.q,
+      filter: 'conditionIds:{1000|1500|2000|2500|3000|4000|5000|6000|7000},' +
+              'buyingOptions:{FIXED_PRICE|AUCTION},' +
+              'priceCurrency:GBP',
+      sort: '-price',
+      limit: '20'
+    });
+    if (attempt.categoryId) params.set('category_ids', attempt.categoryId);
 
-  const response = await httpsRequest(searchUrl, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'X-EBAY-C-MARKETPLACE-ID': 'EBAY_GB',
-      'X-EBAY-C-ENDUSERCTX': 'affiliateCampaignId=<eBayCampaignId>,affiliateReferenceId=<referenceId>',
-      'Content-Type': 'application/json'
+    const response = await httpsRequest(`${browseUrl}?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_GB',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.statusCode !== 200) {
+      const err = JSON.parse(response.body || '{}');
+      throw new Error(`eBay search failed (${response.statusCode}): ${err.errors?.[0]?.message || 'Unknown error'}`);
     }
-  });
 
-  if (response.statusCode !== 200) {
-    const err = JSON.parse(response.body || '{}');
-    throw new Error(`eBay search failed (${response.statusCode}): ${err.errors?.[0]?.message || 'Unknown error'}`);
+    lastData = JSON.parse(response.body);
+    lastQuery = attempt.q;
+    if ((lastData.itemSummaries || []).length > 0) break;
   }
 
-  const data = JSON.parse(response.body);
-  return parseEbayResults(data, item);
+  const result = parseEbayResults(lastData || {}, item);
+  result.searchQuery = lastQuery;
+  return result;
+}
+
+/**
+ * Build progressively broader search queries so we keep finding prices
+ * even when the most specific query returns zero hits.
+ */
+function buildSearchAttempts(item) {
+  const attempts = [];
+  const mfg = (item.manufacturer || '').trim();
+  const code = (item.productCode || '').trim();
+  const name = (item.name || '').trim();
+
+  // 1) Most specific: product code + manufacturer, OO category
+  if (code) {
+    attempts.push({
+      q: mfg ? `${mfg} ${code}` : code,
+      categoryId: '180293'
+    });
+    // 2) Product code alone, no category filter — sellers often miscategorise
+    attempts.push({ q: code, categoryId: null });
+  }
+
+  // 3) Manufacturer + name + "OO gauge", OO category
+  if (name) {
+    const q = mfg ? `${mfg} ${name} OO gauge` : `${name} OO gauge`;
+    attempts.push({ q, categoryId: '180293' });
+  }
+
+  // 4) Manufacturer + name, no "OO gauge", no category — broadest net
+  if (name) {
+    attempts.push({
+      q: mfg ? `${mfg} ${name}` : name,
+      categoryId: null
+    });
+  }
+
+  // Fallback if somehow nothing else applies
+  if (attempts.length === 0) {
+    attempts.push({ q: name || code || 'OO gauge', categoryId: '180293' });
+  }
+
+  return attempts;
 }
 
 /**

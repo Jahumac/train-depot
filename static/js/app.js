@@ -609,13 +609,26 @@ const app = {
     await this.loadStats();
     document.getElementById('statsBar').style.display = '';
     this.render();
+
+    // Restore scroll position if returning from a detail view
+    if (this.catalogScrollY != null) {
+      window.scrollTo({ top: this.catalogScrollY, behavior: 'instant' });
+      this.catalogScrollY = null;
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
   },
 
   async showDetail(id) {
+    // Remember where the user was in the catalog so we can restore it on return
+    if (this.currentView === 'catalog') {
+      this.catalogScrollY = window.scrollY;
+    }
     this.currentView = 'detail';
     try {
       this.detailItem = await this.api(`/api/items/${id}`);
       this.render();
+      window.scrollTo({ top: 0, behavior: 'instant' });
     } catch (e) { /* toast already shown */ }
   },
 
