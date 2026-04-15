@@ -1396,12 +1396,26 @@ img { max-width: 100%; height: auto; }
 
 /* === Mobile layout fixes === */
 @media (max-width: 768px) {
-  /* Valuation listings — stack rows vertically so nothing gets truncated */
+  /* Global safety — prevent horizontal overflow across the whole app */
+  html, body { overflow-x: hidden; max-width: 100vw; }
+  .main-content { overflow-x: hidden; }
+
+  /* Detail page grid children MUST allow shrinking below content width,
+     otherwise long titles/URLs push the page wider than the viewport
+     and the image appears cropped/cut in half. */
+  .detail-body > * { min-width: 0; }
+  .item-detail { overflow: hidden; }
+  .detail-info { padding: 16px; }
+  .detail-info > * { max-width: 100%; word-wrap: break-word; overflow-wrap: break-word; }
+
+  /* Valuation listings — stack rows vertically, wrap long content */
   .valuation-listing {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
     padding: 10px 12px;
+    width: 100%;
+    box-sizing: border-box;
   }
   .valuation-listing-title {
     white-space: normal;
@@ -1409,27 +1423,21 @@ img { max-width: 100%; height: auto; }
     text-overflow: clip;
     width: 100%;
     line-height: 1.35;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
-  .valuation-listing-price {
-    font-size: 0.95rem;
-  }
+  .valuation-listing-price { font-size: 0.95rem; }
   .valuation-listing-link {
-    padding: 4px 0;  /* bigger tap target */
+    padding: 4px 0;
+    white-space: normal;
+    word-break: break-word;
   }
 
-  /* Valuation panel header — let title + button wrap if needed */
-  .valuation-panel-header {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  /* Valuation stats — stack to one-per-row so gain/loss doesn't get chopped */
-  .valuation-stats {
-    gap: 14px;
-  }
-  .valuation-stat {
-    min-width: 45%;
-  }
+  /* Valuation panel — contain width */
+  .valuation-panel { max-width: 100%; box-sizing: border-box; overflow: hidden; }
+  .valuation-panel-header { flex-wrap: wrap; gap: 8px; }
+  .valuation-stats { gap: 14px; }
+  .valuation-stat { min-width: 45%; }
 
   /* Detail header — stack actions below the back link */
   .detail-header {
@@ -1438,19 +1446,18 @@ img { max-width: 100%; height: auto; }
     gap: 12px;
     padding: 16px;
   }
-  .detail-actions {
-    flex-wrap: wrap;
-    width: 100%;
-  }
+  .detail-actions { flex-wrap: wrap; width: 100%; }
+
+  /* Detail text fields — always wrap long values (URLs, long names) */
+  .detail-fields .detail-field-value,
+  .detail-name,
+  .detail-section p { word-wrap: break-word; overflow-wrap: break-word; }
 
   /* Modal — less wasted padding, full-width footer buttons */
   .modal { width: 95%; max-height: 92vh; }
   .modal-body { padding: 16px; }
   .modal-header { padding: 14px 16px; }
-  .modal-footer {
-    padding: 12px 16px;
-    flex-wrap: wrap;
-  }
+  .modal-footer { padding: 12px 16px; flex-wrap: wrap; }
   .modal-footer .btn { flex: 1; min-width: 0; }
 
   /* Dashboard chart cards — prevent canvas overflow */
@@ -1464,8 +1471,35 @@ img { max-width: 100%; height: auto; }
   .dashboard-cards-grid,
   .dashboard-cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important; }
 
-  /* Items header actions — wrap buttons */
-  .items-header-actions { flex-wrap: wrap; gap: 8px; }
+  /* Items header actions — wrap buttons, make Advanced Filters obvious */
+  .items-header-actions { flex-wrap: wrap; gap: 8px; width: 100%; }
+  .items-header-actions .sort-select { flex: 1; min-width: 120px; }
+
+  /* Advanced Filters toggle — make it look obviously clickable */
+  .filter-panel { padding: 12px 16px; }
+  .filter-panel-toggle {
+    background: var(--color-bg-hover);
+    padding: 10px 12px;
+    margin: -12px -16px;
+    border-radius: var(--radius-md);
+    justify-content: space-between;
+  }
+  .filter-panel-toggle::after {
+    content: '▾';
+    transition: transform 0.2s;
+    font-size: 1rem;
+  }
+  .filter-panel.is-open .filter-panel-toggle::after {
+    transform: rotate(180deg);
+  }
+  .filter-panel-body.open { margin-top: 12px; }
+  .filter-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .filter-actions { flex-wrap: wrap; }
+  .filter-actions .btn { flex: 1; }
+}
+
+@media (max-width: 480px) {
+  .filter-row { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
@@ -2457,6 +2491,68 @@ img { max-width: 100%; height: auto; }
   font-size: 0.72rem;
   color: var(--color-text-muted);
   font-weight: 600;
+}
+
+/* Mobile-only horizontal tag bar — sits above the items grid for quick access */
+.mobile-tag-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.mobile-tag-bar-label {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.mobile-tag-bar-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  padding-bottom: 2px;
+}
+.mobile-tag-bar-scroll::-webkit-scrollbar { height: 3px; }
+.mobile-tag-bar-scroll::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
+
+.mobile-tag-chip {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  background: var(--gold-glow, rgba(201, 162, 39, 0.15));
+  color: var(--color-primary);
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.mobile-tag-chip:hover,
+.mobile-tag-chip.active {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+.mobile-tag-chip-count {
+  opacity: 0.7;
+  font-weight: 500;
+  margin-left: 2px;
+}
+.mobile-tag-chip-clear {
+  background: transparent;
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+@media (max-width: 768px) {
+  .mobile-tag-bar { display: flex; }
 }
 
 /* ==================== v1.3.0 New Features ==================== */

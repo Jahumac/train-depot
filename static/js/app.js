@@ -813,6 +813,7 @@ const app = {
         <div class="catalog-layout">
           ${this.renderSidebar()}
           <div class="catalog-main">
+            ${this.renderMobileTagBar()}
             ${this.renderFilterPanel()}
             <div class="items-header">
               <div>
@@ -3231,6 +3232,26 @@ const app = {
     return '';
   },
 
+  renderMobileTagBar() {
+    const allTags = this.getAllTagsForSidebar();
+    if (allTags.length === 0) return '';
+    const activeTag = this.currentFilter?.type === 'tag' ? this.currentFilter.value : null;
+    return `
+      <div class="mobile-tag-bar">
+        <span class="mobile-tag-bar-label">🏷️</span>
+        <div class="mobile-tag-bar-scroll">
+          ${activeTag ? `<button class="mobile-tag-chip mobile-tag-chip-clear" onclick="app.showCatalog()">✕ Clear</button>` : ''}
+          ${allTags.map(tag => `
+            <button class="mobile-tag-chip ${activeTag === tag.name ? 'active' : ''}"
+                    onclick="app.showCatalog({type:'tag',value:'${this.esc(tag.name)}'})">
+              #${this.esc(tag.name)} <span class="mobile-tag-chip-count">${tag.count}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  },
+
   getAllTagsForSidebar() {
     const tagCounts = {};
     this.items.forEach(item => {
@@ -3465,7 +3486,9 @@ const app = {
   toggleFilterPanel() {
     this.filterPanelOpen = !this.filterPanelOpen;
     const body = document.getElementById('filterPanelBody');
+    const panel = body?.closest('.filter-panel');
     if (body) body.classList.toggle('open', this.filterPanelOpen);
+    if (panel) panel.classList.toggle('is-open', this.filterPanelOpen);
   },
 
   setFilter(key, value) {
