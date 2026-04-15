@@ -146,5 +146,42 @@ Object.assign(app, {
       <circle cx="56" cy="58" r="6" fill="#444" stroke="#555" stroke-width="1.5"/><circle cx="56" cy="58" r="2" fill="#c9a227"/>
       <circle cx="37" cy="58" r="5" fill="#444" stroke="#555" stroke-width="1.5"/><circle cx="37" cy="58" r="1.5" fill="#c9a227"/>
     </svg>`;
+  },
+
+  mascotMedium(mood = 'happy') {
+    const mouth = mood === 'happy'
+      ? '<path d="M42 68 Q56 80 70 68" stroke="#333" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+      : '<path d="M44 74 Q56 66 68 74" stroke="#333" stroke-width="2.5" fill="none" stroke-linecap="round"/>';
+    return `<svg viewBox="0 0 112 100" width="100" height="90" xmlns="http://www.w3.org/2000/svg">
+      <!-- Body -->
+      <rect x="10" y="20" width="92" height="58" rx="16" fill="#2d6a4f"/>
+      <!-- Gold stripe -->
+      <rect x="10" y="16" width="92" height="14" rx="7" fill="#c9a227"/>
+      <!-- Chimney -->
+      <rect x="44" y="2" width="24" height="16" rx="6" fill="#1b4332"/>
+      <rect x="40" y="0" width="32" height="7" rx="4" fill="#0f2b1f"/>
+      <!-- Steam puffs -->
+      <g opacity="0.3" fill="white">
+        <circle cx="40" cy="6" r="5"><animate attributeName="cy" values="6;0;6" dur="3s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.3;0;0.3" dur="3s" repeatCount="indefinite"/></circle>
+        <circle cx="72" cy="4" r="4"><animate attributeName="cy" values="4;-2;4" dur="4s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.25;0;0.25" dur="4s" repeatCount="indefinite"/></circle>
+      </g>
+      <!-- Eyes -->
+      <circle cx="40" cy="48" r="10" fill="white"/>
+      <circle cx="41.5" cy="49" r="5" fill="#333"/>
+      <circle cx="43" cy="47" r="1.5" fill="white"/>
+      <circle cx="72" cy="48" r="10" fill="white"/>
+      <circle cx="73.5" cy="49" r="5" fill="#333"/>
+      <circle cx="75" cy="47" r="1.5" fill="white"/>
+      <!-- Rosy cheeks -->
+      <circle cx="28" cy="58" r="6" fill="#e8886850"/>
+      <circle cx="84" cy="58" r="6" fill="#e8886850"/>
+      ${mouth}
+      <!-- Wheels -->
+      <circle cx="28" cy="88" r="9" fill="#444" stroke="#555" stroke-width="2"/><circle cx="28" cy="88" r="3" fill="#c9a227"/>
+      <circle cx="56" cy="88" r="8" fill="#444" stroke="#555" stroke-width="2"/><circle cx="56" cy="88" r="2.5" fill="#c9a227"/>
+      <circle cx="84" cy="88" r="9" fill="#444" stroke="#555" stroke-width="2"/><circle cx="84" cy="88" r="3" fill="#c9a227"/>
+      <!-- Headlamp -->
+      <circle cx="10" cy="44" r="5" fill="#FFD700" opacity="0.8"/><circle cx="10" cy="44" r="2.5" fill="#FFF8DC"/>
+    </svg>`;
   }
 });
