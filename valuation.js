@@ -113,21 +113,22 @@ async function searchEbay(item, config) {
   const token = await getOAuthToken(config.appId, config.certId, config.sandbox);
   const browseUrl = config.sandbox ? EBAY_SANDBOX_BROWSE_URL : EBAY_BROWSE_URL;
 
-  // Build a list of progressively broader queries — stop at the first with results.
+  // Build progressively broader queries — all stay in the OO gauge category
+  // so we never cross-match N-gauge or O-gauge items (different price tier).
   const attempts = buildSearchAttempts(item);
 
-  let lastData = null;
-  let lastQuery = '';
+  let bestData = null;
+  let bestQuery = '';
   for (const attempt of attempts) {
     const params = new URLSearchParams({
       q: attempt.q,
+      category_ids: '180293',  // OO Gauge — always enforced
       filter: 'conditionIds:{1000|1500|2000|2500|3000|4000|5000|6000|7000},' +
               'buyingOptions:{FIXED_PRICE|AUCTION},' +
               'priceCurrency:GBP',
       sort: '-price',
-      limit: '20'
+      limit: '30'
     });
-    if (attempt.categoryId) params.set('category_ids', attempt.categoryId);
 
     const response = await httpsRequest(`${browseUrl}?${params.toString()}`, {
       method: 'GET',
@@ -143,19 +144,22 @@ async function searchEbay(item, config) {
       throw new Error(`eBay search failed (${response.statusCode}): ${err.errors?.[0]?.message || 'Unknown error'}`);
     }
 
-    lastData = JSON.parse(response.body);
-    lastQuery = attempt.q;
-    if ((lastData.itemSummaries || []).length > 0) break;
+    const data = JSON.parse(response.body);
+    const filtered = filterRelevantListings(data.itemSummaries || [], item);
+    if (filtered.length > 0) {
+      bestData = { itemSummaries: filtered };
+      bestQuery = attempt.q;
+      break;
+    }
   }
 
-  const result = parseEbayResults(lastData || {}, item);
-  result.searchQuery = lastQuery;
+  const result = parseEbayResults(bestData || {}, item);
+  result.searchQuery = bestQuery;
   return result;
 }
 
 /**
- * Build progressively broader search queries so we keep finding prices
- * even when the most specific query returns zero hits.
+ * Progressively broader queries. All stay in the OO gauge category.
  */
 function buildSearchAttempts(item) {
   const attempts = [];
@@ -163,36 +167,36 @@ function buildSearchAttempts(item) {
   const code = (item.productCode || '').trim();
   const name = (item.name || '').trim();
 
-  // 1) Most specific: product code + manufacturer, OO category
-  if (code) {
-    attempts.push({
-      q: mfg ? `${mfg} ${code}` : code,
-      categoryId: '180293'
-    });
-    // 2) Product code alone, no category filter — sellers often miscategorise
-    attempts.push({ q: code, categoryId: null });
-  }
+  if (code && mfg) attempts.push({ q: `${mfg} ${code}` });
+  if (code) attempts.push({ q: code });
+  if (name && mfg) attempts.push({ q: `${mfg} ${name}` });
+  if (name) attempts.push({ q: name });
 
-  // 3) Manufacturer + name + "OO gauge", OO category
-  if (name) {
-    const q = mfg ? `${mfg} ${name} OO gauge` : `${name} OO gauge`;
-    attempts.push({ q, categoryId: '180293' });
-  }
-
-  // 4) Manufacturer + name, no "OO gauge", no category — broadest net
-  if (name) {
-    attempts.push({
-      q: mfg ? `${mfg} ${name}` : name,
-      categoryId: null
-    });
-  }
-
-  // Fallback if somehow nothing else applies
-  if (attempts.length === 0) {
-    attempts.push({ q: name || code || 'OO gauge', categoryId: '180293' });
-  }
-
+  if (attempts.length === 0) attempts.push({ q: 'OO gauge' });
   return attempts;
+}
+
+/**
+ * Keep only listings whose title plausibly matches our item.
+ * Must contain the product code, the manufacturer, OR a distinctive
+ * name keyword. Filters out the false matches that inflated the
+ * "Best Deals" list (wrong-scale or wrong-product items).
+ */
+function filterRelevantListings(listings, item) {
+  const code = (item.productCode || '').toLowerCase().trim();
+  const mfg = (item.manufacturer || '').toLowerCase().trim();
+  const nameWords = (item.name || '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(w => w.length >= 4 && !['with', 'class', 'tank', 'type'].includes(w));
+
+  return listings.filter(l => {
+    const title = (l.title || '').toLowerCase();
+    if (code && title.includes(code)) return true;
+    if (mfg && title.includes(mfg)) return true;
+    if (nameWords.some(w => title.includes(w))) return true;
+    return false;
+  });
 }
 
 /**
