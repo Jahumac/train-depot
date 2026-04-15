@@ -906,8 +906,9 @@ const app = {
             ` : ''}
           ` : `
             <p class="catalog-tags-empty">
-              No tags yet. Open any item and add tags like <em>layout-ready</em>, <em>needs-service</em>, or <em>display</em> to group items however you like.
+              No tags yet. Open any item's edit screen, type a tag in the <strong>Tags</strong> field and press Enter. Good examples: "layout-ready", "needs-service", "display".
             </p>
+            <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;" onclick="app.openAddModal()">➕ Add an item with tags</button>
           `}
         </div>
 

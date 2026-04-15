@@ -2423,14 +2423,8 @@ img { max-width: 100%; height: auto; }
   background: var(--color-bg-hover);
   border-radius: var(--radius-sm);
 }
-.catalog-tags-empty em {
-  font-style: normal;
-  background: var(--gold-glow, rgba(201, 162, 39, 0.15));
-  color: var(--color-primary);
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 0.8rem;
-  font-weight: 600;
+.catalog-tags-empty strong {
+  color: var(--color-text);
 }
 
 /* Tag chips on catalog cards — makes the tag system visible in context */
