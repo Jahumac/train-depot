@@ -118,7 +118,6 @@ Object.assign(app, {
               <span class="stat-icon">📂</span>
               <span>Categories &amp; Tags</span>
             </button>
-            ${this.renderMobileTagBar()}
             ${this.renderFilterPanel()}
             <div class="items-header">
               <div>
