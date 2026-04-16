@@ -3,7 +3,7 @@
  * Caches static assets, API data, and uploaded images for a fast PWA experience.
  */
 
-const CACHE_NAME = 'train-depot-v1.7';
+const CACHE_NAME = 'train-depot-v1.8';
 const DATA_CACHE = 'train-depot-data-v1';
 
 const STATIC_ASSETS = [

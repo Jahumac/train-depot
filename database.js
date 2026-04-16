@@ -198,6 +198,7 @@ function createItem(itemData) {
     storageLocation: itemData.storageLocation || '',
     serviceLog: itemData.serviceLog || [],
     tags: itemData.tags || [],
+    imageFocalPoints: itemData.imageFocalPoints || {},
     // Valuation data
     valuation: itemData.valuation || null,
     deleted: false,
@@ -221,7 +222,7 @@ function updateItem(id, updates) {
     'categoryId', 'subcategoryId', 'images', 'wishlist',
     'wishlistNotes', 'wishlistSpottedPrice', 'wishlistSpottedAt',
     'runningNumber', 'productCode', 'condition', 'dccStatus', 'purchaseDate',
-    'storageLocation', 'serviceLog', 'tags', 'valuation'];
+    'storageLocation', 'serviceLog', 'tags', 'imageFocalPoints', 'valuation'];
 
   for (const key of allowed) {
     if (updates[key] !== undefined) {
@@ -231,6 +232,8 @@ function updateItem(id, updates) {
         db.items[idx][key] = !!updates[key];
       } else if (key === 'serviceLog' || key === 'tags') {
         db.items[idx][key] = Array.isArray(updates[key]) ? updates[key] : [];
+      } else if (key === 'imageFocalPoints') {
+        db.items[idx][key] = updates[key] && typeof updates[key] === 'object' ? updates[key] : {};
       } else if (key === 'valuation') {
         db.items[idx][key] = updates[key] && typeof updates[key] === 'object' ? updates[key] : null;
       } else {

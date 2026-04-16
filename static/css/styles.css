@@ -660,47 +660,7 @@ body.drawer-open { overflow: hidden; }
   transform: rotate(180deg);
 }
 
-/* Stats breakdown toggle — hidden on desktop (pills shown inline), shown on mobile */
-.stats-breakdown-toggle {
-  display: none;
-  align-items: center;
-  gap: 8px;
-  background: var(--color-bg);
-  padding: 8px 14px;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.stats-breakdown-toggle:hover {
-  border-color: var(--color-accent);
-}
-
-.stats-breakdown-toggle .stat-icon {
-  font-size: 1rem;
-  transition: transform 0.2s ease;
-}
-
-.stats-breakdown-toggle.open .stat-icon {
-  transform: rotate(180deg);
-}
-
-.stats-breakdown-count {
-  background: var(--color-primary);
-  color: white;
-  font-weight: 700;
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 10px;
-  min-width: 20px;
-  text-align: center;
-}
-
+/* Subcategory breakdown pills — shown inline on desktop */
 .stats-breakdown {
   display: contents;
 }
@@ -1967,9 +1927,8 @@ body.drawer-open { overflow: hidden; }
   .stats-expand-toggle { display: inline-flex; }  /* show expand arrow */
   .stats-bar.expanded .stat-tag { display: inline-flex; font-size: 0.78rem; padding: 5px 10px; }
   .stats-bar.expanded .stats-summary-line { display: none; }
-  .stats-breakdown-toggle { display: inline-flex; }
-  .stats-breakdown { display: none; flex-basis: 100%; gap: 6px; flex-wrap: wrap; }
-  .stats-breakdown.open { display: flex; }
+  .stats-breakdown { display: none; }
+  .stats-bar.expanded .stats-breakdown { display: contents; }
 
   .hero-title { font-size: 2rem; }
   .hero-subtitle { font-size: 1rem; }
@@ -2257,21 +2216,18 @@ body.drawer-open { overflow: hidden; }
   .item-card-image {
     flex: 0 0 112px;
     width: 112px;
+    height: auto;
     min-height: 104px;
     align-self: stretch;
-    position: relative;       /* anchor for the absolutely-positioned img */
-    overflow: hidden;
     background: var(--color-bg);
     border-right: 1px solid var(--color-border);
   }
 
   .item-card-image img {
-    position: absolute;
-    inset: 0;                 /* fill the container exactly */
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center 25%;  /* favour top quarter — shows the train, not the sky */
+    object-position: center;
   }
 
   /* Badges overlaid on the thumbnail — smaller, hugs the corner */

@@ -764,25 +764,9 @@ const app = {
   renderSubcategoryStats(s) {
     const nonZero = Object.entries(s.bySubcategory).filter(([, v]) => v.count > 0);
     if (nonZero.length === 0) return '';
-    const pills = nonZero.map(([, v]) =>
+    return nonZero.map(([, v]) =>
       `<span class="stat-tag"><span class="stat-value">${v.count}</span> ${v.name}</span>`
     ).join('');
-    return `
-      <button class="stats-breakdown-toggle" onclick="app.toggleStatsBreakdown()" aria-label="Show category breakdown">
-        <span class="stat-icon">▾</span>
-        <span>Categories</span>
-        <span class="stats-breakdown-count">${nonZero.length}</span>
-      </button>
-      <div class="stats-breakdown" id="statsBreakdown">${pills}</div>
-    `;
-  },
-
-  toggleStatsBreakdown() {
-    const el = document.getElementById('statsBreakdown');
-    const btn = document.querySelector('.stats-breakdown-toggle');
-    if (!el) return;
-    const open = el.classList.toggle('open');
-    if (btn) btn.classList.toggle('open', open);
   },
 
   // Landing + Catalog + Sidebar + Item Card + Empty → moved to catalog.js
