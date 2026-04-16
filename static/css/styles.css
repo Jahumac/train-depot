@@ -1824,6 +1824,11 @@ body.drawer-open { overflow: hidden; }
   .dashboard-cards-grid,
   .dashboard-cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important; }
 
+  /* Items header — tighter so it doesn't eat half the screen before the list */
+  .items-header { margin-bottom: 14px; gap: 10px; }
+  .items-title { font-size: 1.25rem; }
+  .items-count { font-size: 0.85rem; }
+
   /* Items header actions — wrap buttons, make Advanced Filters obvious */
   .items-header-actions { flex-wrap: wrap; gap: 8px; width: 100%; }
   .items-header-actions .sort-select { flex: 1; min-width: 120px; }
@@ -1849,6 +1854,148 @@ body.drawer-open { overflow: hidden; }
   .filter-row { grid-template-columns: 1fr 1fr; gap: 8px; }
   .filter-actions { flex-wrap: wrap; }
   .filter-actions .btn { flex: 1; }
+
+  /* ============================================================
+     Mobile catalog — compact horizontal list rows
+     ------------------------------------------------------------
+     Swap the desktop stacked card (tall image + text block) for a
+     list-row layout: small square thumbnail on the left, text on
+     the right. Fits 4–5 items per screen, keeps photos readable.
+     ============================================================ */
+
+  .items-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+
+  .item-card {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+    min-height: 104px;
+  }
+
+  .item-card:hover {
+    /* Disable the desktop lift — feels jittery on touch scrolling */
+    transform: none;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .item-card-image {
+    flex: 0 0 112px;
+    width: 112px;
+    height: auto;       /* let card height drive it */
+    min-height: 104px;
+    align-self: stretch;
+    background: var(--color-bg);
+    border-right: 1px solid var(--color-border);
+  }
+
+  .item-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  /* Badges overlaid on the thumbnail — smaller, hugs the corner */
+  .item-card-badge {
+    display: none; /* category badge moved into the body row */
+  }
+
+  .item-card-number {
+    bottom: 4px;
+    left: 4px;
+    padding: 1px 6px;
+    font-size: 0.65rem;
+    letter-spacing: 0.3px;
+  }
+
+  .item-card-wishlist-badge {
+    top: 4px;
+    left: 4px;
+    width: 20px;
+    height: 20px;
+    font-size: 0.75rem;
+  }
+
+  .item-card-service-icon {
+    top: 4px;
+    right: 4px;
+    bottom: auto;
+    width: 22px;
+    height: 22px;
+    font-size: 0.7rem;
+  }
+
+  .item-card-body {
+    flex: 1;
+    min-width: 0;  /* allow truncation */
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    justify-content: center;
+  }
+
+  .item-card-name {
+    font-size: 0.95rem;
+    line-height: 1.25;
+    margin-bottom: 0;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+  }
+
+  .item-card-meta {
+    padding-top: 0;
+    border-top: none;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .item-card-price {
+    font-size: 0.95rem;
+  }
+
+  .item-card-manufacturer {
+    font-size: 0.7rem;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .item-card-valuation {
+    margin-top: 0;
+  }
+
+  .item-card-valuation .valuation-badge {
+    font-size: 0.7rem;
+    padding: 1px 7px;
+  }
+
+  /* Tags – keep tight; only show first 2 on mobile list rows */
+  .item-card-tags {
+    gap: 3px;
+    margin-top: 2px;
+  }
+  .item-card-tag,
+  .item-card-tag-more {
+    font-size: 0.65rem;
+    padding: 1px 6px;
+  }
+
+  /* Placeholder silhouette — scale down so it sits neatly in the 112px thumb */
+  .item-silhouette {
+    width: 70%;
+    max-width: 90px;
+  }
 }
 
 @media (max-width: 480px) {
