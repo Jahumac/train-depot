@@ -224,27 +224,27 @@ Object.assign(app, {
   renderItemCard(item) {
     const img = item.images && item.images.length > 0
       ? `<img src="${item.images[0]}" alt="${this.esc(item.name)}" loading="lazy">`
-      : `<span class="item-card-placeholder">${item.categoryId === 'locomotives' ? '🚂' : '🚃'}</span>`;
+      : `<div class="item-card-placeholder">${this.categorySilhouette(item.categoryId)}</div>`;
     const subcatName = this.getSubcategoryName(item.subcategoryId);
+    const overdue = this.daysSinceService(item.lastServiceDate) > (this.settings.serviceIntervalDays || 365);
+    const price = item.purchasePrice ? this.settings.currency + item.purchasePrice.toFixed(2) : '—';
+    const manufacturer = item.manufacturer ? this.esc(item.manufacturer) : '';
     return `
       <div class="item-card" onclick="app.showDetail('${item.id}')">
         <div class="item-card-image">
           ${img}
           ${subcatName ? `<span class="item-card-badge">${subcatName}</span>` : ''}
-          ${item.wishlist ? '<span class="item-card-wishlist-badge">⭐</span>' : ''}
+          ${item.wishlist ? '<span class="item-card-wishlist-badge" title="Wishlist">⭐</span>' : ''}
+          ${overdue ? '<span class="item-card-service-icon" title="Service overdue">🔧</span>' : ''}
           ${item.runningNumber ? `<span class="item-card-number">${this.esc(item.runningNumber)}</span>` : ''}
         </div>
         <div class="item-card-body">
           <div class="item-card-name">${this.esc(item.name)}</div>
-          <div class="item-card-manufacturer">
-            <span>${this.esc(item.manufacturer || 'Unknown manufacturer')}</span>
-            ${item.runningNumber ? `<span class="item-card-number-chip">№ ${this.esc(item.runningNumber)}</span>` : ''}
-          </div>
           <div class="item-card-meta">
-            <span class="item-card-price">${item.purchasePrice ? this.settings.currency + item.purchasePrice.toFixed(2) : '—'}</span>
-            ${this.renderValuationBadge(item)}
-            ${!item.valuation && item.currentValue ? `<span class="item-card-value">Val: ${this.settings.currency}${item.currentValue.toFixed(2)}</span>` : ''}
+            <span class="item-card-price">${price}</span>
+            ${manufacturer ? `<span class="item-card-manufacturer">${manufacturer}</span>` : ''}
           </div>
+          ${this.renderValuationBadge(item) ? `<div class="item-card-valuation">${this.renderValuationBadge(item)}</div>` : ''}
           ${item.tags && item.tags.length > 0 ? `
             <div class="item-card-tags">
               ${item.tags.slice(0, 4).map(t => `
@@ -253,10 +253,44 @@ Object.assign(app, {
               ${item.tags.length > 4 ? `<span class="item-card-tag-more">+${item.tags.length - 4}</span>` : ''}
             </div>
           ` : ''}
-          ${this.daysSinceService(item.lastServiceDate) > (this.settings.serviceIntervalDays || 365) ? '<div class="item-card-service-warn">🔧 Service overdue</div>' : ''}
         </div>
       </div>
     `;
+  },
+
+  /** SVG silhouette shown when an item has no photo yet. */
+  categorySilhouette(categoryId) {
+    if (categoryId === 'locomotives') {
+      // Side-view steam loco — boiler, cab, chimney, driving wheels.
+      return `<svg class="item-silhouette" viewBox="0 0 180 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <g fill="currentColor">
+          <rect x="16" y="26" width="100" height="28" rx="3"/>
+          <rect x="110" y="18" width="34" height="36" rx="2"/>
+          <rect x="30" y="8" width="14" height="20" rx="2"/>
+          <rect x="26" y="4" width="22" height="6" rx="2"/>
+          <rect x="60" y="14" width="10" height="14" rx="1.5"/>
+          <rect x="8" y="50" width="140" height="6" rx="2"/>
+        </g>
+        <g fill="currentColor" opacity="0.9">
+          <circle cx="38" cy="60" r="9"/>
+          <circle cx="70" cy="60" r="12"/>
+          <circle cx="100" cy="60" r="12"/>
+          <circle cx="132" cy="60" r="9"/>
+        </g>
+      </svg>`;
+    }
+    // Wagon / rolling stock — covered van silhouette.
+    return `<svg class="item-silhouette" viewBox="0 0 180 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <g fill="currentColor">
+        <rect x="20" y="18" width="140" height="36" rx="3"/>
+        <path d="M50 18 L50 54 M90 18 L90 54 M130 18 L130 54" stroke="var(--color-bg-card)" stroke-width="2" opacity="0.35"/>
+        <rect x="10" y="50" width="160" height="6" rx="2"/>
+      </g>
+      <g fill="currentColor" opacity="0.9">
+        <circle cx="50" cy="62" r="9"/>
+        <circle cx="130" cy="62" r="9"/>
+      </g>
+    </svg>`;
   },
 
   renderEmpty() {
