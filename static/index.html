@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Train Depot</title>
-  <link rel="stylesheet" href="/css/styles.css?v=29">
+  <link rel="stylesheet" href="/css/styles.css?v=30">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚂</text></svg>">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1b4332">
@@ -254,11 +254,16 @@
                  ondragover="event.preventDefault(); this.classList.add('dragover')"
                  ondragleave="this.classList.remove('dragover')"
                  ondrop="app.handleDrop(event)">
-              <span class="upload-icon">📷</span>
+              <span class="upload-icon">🖼️</span>
               <div class="upload-text">Click or drag images here</div>
               <div class="upload-hint">JPG, PNG, GIF, WebP (max 10MB each)</div>
             </div>
+            <div class="upload-actions">
+              <button type="button" class="btn btn-primary" onclick="document.getElementById('cameraInput').click()">📷 Take Photo</button>
+              <button type="button" class="btn btn-outline" onclick="document.getElementById('fileInput').click()">🖼️ Choose from Library</button>
+            </div>
             <input type="file" id="fileInput" multiple accept="image/*" style="display:none" onchange="app.handleFileSelect(event)">
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="app.handleFileSelect(event)">
             <div class="upload-previews" id="uploadPreviews"></div>
           </div>
         </form>
