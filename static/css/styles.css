@@ -1899,6 +1899,28 @@ body.drawer-open { overflow: hidden; }
   /* Dashboard chart cards — prevent canvas overflow */
   .dashboard-chart-container { padding: 14px; overflow: hidden; }
   .dashboard-chart-container canvas { max-width: 100%; height: auto !important; }
+  .dashboard-chart-title { font-size: 1.05rem; margin-bottom: 14px; }
+
+  /* Dashboard top metric tiles — 2 per row on phones, smaller padding/numbers
+     so the value never overflows a narrow card */
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .dashboard-card { padding: 14px; }
+  .dashboard-card-title { font-size: 0.68rem; letter-spacing: 1px; }
+  .dashboard-card-value {
+    font-size: 1.35rem;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .dashboard-card-change { font-size: 0.8rem; padding-top: 6px; margin-top: 6px; }
+
+  /* Dashboard list items — keep name + value from colliding on tight rows */
+  .dashboard-list-item { gap: 10px; font-size: 0.9rem; }
+  .dashboard-list-name { min-width: 0; word-break: break-word; }
+  .dashboard-list-value { white-space: nowrap; }
 
   /* Tag chips and goes-well chips — allow wrapping */
   .tags-container, .goes-well-chips { flex-wrap: wrap; }
