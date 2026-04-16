@@ -17,10 +17,19 @@ Object.assign(app, {
     this.currentLightboxIndex = 0;
     const mainImg = item.images && item.images.length > 0
       ? `<img src="${item.images[0]}" id="detailMainImg" alt="${this.esc(item.name)}" onclick="app.openLightbox(0)" style="cursor:pointer;">`
-      : `<span class="placeholder-icon">${item.categoryId === 'locomotives' ? '🚂' : '🚃'}</span>`;
+      : `<div class="detail-main-placeholder">${this.categorySilhouette(item.categoryId)}</div>`;
 
     const catName = this.getCategoryName(item.categoryId);
     const subcatName = this.getSubcategoryName(item.subcategoryId);
+    const serviceOverdue = this.daysSinceService(item.lastServiceDate) > (this.settings.serviceIntervalDays || 365);
+
+    // Quick Facts — compact at-a-glance pill under the title
+    const quickFacts = [
+      item.manufacturer ? this.esc(item.manufacturer) : null,
+      item.livery ? this.esc(item.livery) : null,
+      subcatName ? subcatName : null,
+      item.runningNumber ? `No. ${this.esc(item.runningNumber)}` : null,
+    ].filter(Boolean);
 
     return `
       <div class="main-content">
@@ -35,7 +44,12 @@ Object.assign(app, {
           </div>
           <div class="detail-body">
             <div class="detail-images">
-              <div class="detail-main-image">${mainImg}</div>
+              <div class="detail-main-image">
+                ${mainImg}
+                ${item.wishlist ? '<span class="detail-hero-wishlist" title="Wishlist">⭐</span>' : ''}
+                ${serviceOverdue ? '<span class="detail-hero-service" title="Service overdue">🔧</span>' : ''}
+                ${item.runningNumber ? `<span class="detail-hero-nameplate">${this.esc(item.runningNumber)}</span>` : ''}
+              </div>
               ${item.images && item.images.length > 1 ? `
                 <div class="detail-thumbnails">
                   ${item.images.map((img, i) => `
@@ -50,15 +64,20 @@ Object.assign(app, {
               <h1 class="detail-name">${this.esc(item.name)}</h1>
               ${subcatName ? `<span class="detail-category-badge">${catName} &mdash; ${subcatName}</span>` : ''}
 
-              ${item.wishlist ? '<div class="detail-wishlist-badge">⭐ Wishlist Item</div>' : ''}
-              ${this.renderWishlistSpotted(item)}
-
-              ${item.runningNumber || item.productCode ? `
-                <div style="margin: 12px 0;">
-                  ${item.runningNumber ? `<div><span style="color: var(--color-text-muted); font-size: 0.85rem;">Running Number:</span> <strong>${this.esc(item.runningNumber)}</strong></div>` : ''}
-                  ${item.productCode ? `<div><span style="color: var(--color-text-muted); font-size: 0.85rem;">Product Code:</span> <strong>${this.esc(item.productCode)}</strong></div>` : ''}
+              ${quickFacts.length > 0 ? `
+                <div class="detail-quick-facts">
+                  ${quickFacts.map(f => `<span class="detail-quick-fact">${f}</span>`).join('<span class="detail-quick-sep">·</span>')}
                 </div>
               ` : ''}
+
+              ${item.productCode ? `
+                <div class="detail-product-code">
+                  <span class="detail-product-code-label">Product Code</span>
+                  <span class="detail-product-code-value">${this.esc(item.productCode)}</span>
+                </div>
+              ` : ''}
+
+              ${this.renderWishlistSpotted(item)}
 
               ${item.condition || item.dccStatus ? `
                 <div style="margin: 12px 0;">
