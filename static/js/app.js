@@ -459,9 +459,13 @@ const app = {
         window.location.href = '/login.html';
         return;
       }
-      // Show logout button if password is set
-      const logoutBtn = document.getElementById('logoutBtn');
-      if (logoutBtn && auth.hasPassword) logoutBtn.style.display = '';
+      // Show logout buttons (desktop header + mobile drawer) if password is set
+      if (auth.hasPassword) {
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) logoutBtn.style.display = '';
+        const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
+        if (mobileLogoutBtn) mobileLogoutBtn.style.display = '';
+      }
     } catch(e) { /* continue anyway */ }
 
     await this.loadSettings();
@@ -523,10 +527,12 @@ const app = {
   },
 
   updateThemeIcon() {
-    const icon = document.getElementById('themeIcon');
-    if (!icon) return;
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    icon.textContent = isDark ? '☀️' : '🌙';
+    const glyph = isDark ? '☀️' : '🌙';
+    const icon = document.getElementById('themeIcon');
+    if (icon) icon.textContent = glyph;
+    const mobileIcon = document.getElementById('mobileThemeIcon');
+    if (mobileIcon) mobileIcon.textContent = glyph;
   },
 
   // ==================== API Helpers ====================
@@ -703,9 +709,25 @@ const app = {
   renderSubcategoryStats(s) {
     const nonZero = Object.entries(s.bySubcategory).filter(([, v]) => v.count > 0);
     if (nonZero.length === 0) return '';
-    return nonZero.map(([, v]) =>
+    const pills = nonZero.map(([, v]) =>
       `<span class="stat-tag"><span class="stat-value">${v.count}</span> ${v.name}</span>`
     ).join('');
+    return `
+      <button class="stats-breakdown-toggle" onclick="app.toggleStatsBreakdown()" aria-label="Show category breakdown">
+        <span class="stat-icon">▾</span>
+        <span>Categories</span>
+        <span class="stats-breakdown-count">${nonZero.length}</span>
+      </button>
+      <div class="stats-breakdown" id="statsBreakdown">${pills}</div>
+    `;
+  },
+
+  toggleStatsBreakdown() {
+    const el = document.getElementById('statsBreakdown');
+    const btn = document.querySelector('.stats-breakdown-toggle');
+    if (!el) return;
+    const open = el.classList.toggle('open');
+    if (btn) btn.classList.toggle('open', open);
   },
 
   // Landing + Catalog + Sidebar + Item Card + Empty → moved to catalog.js
@@ -752,6 +774,34 @@ const app = {
       } else {
         this.showCatalog();
       }
+    }
+  },
+
+  // ==================== Mobile Drawer ====================
+  toggleMobileMenu() {
+    const drawer = document.getElementById('mobileDrawer');
+    const backdrop = document.getElementById('mobileDrawerBackdrop');
+    if (!drawer) return;
+    const open = drawer.classList.toggle('open');
+    if (backdrop) backdrop.classList.toggle('open', open);
+    drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+    document.body.classList.toggle('drawer-open', open);
+  },
+
+  closeMobileMenu() {
+    const drawer = document.getElementById('mobileDrawer');
+    const backdrop = document.getElementById('mobileDrawerBackdrop');
+    if (drawer) { drawer.classList.remove('open'); drawer.setAttribute('aria-hidden', 'true'); }
+    if (backdrop) backdrop.classList.remove('open');
+    document.body.classList.remove('drawer-open');
+  },
+
+  handleMobileSearch(event) {
+    if (event.key === 'Enter') {
+      const q = event.target.value.trim();
+      this.closeMobileMenu();
+      if (q) this.showCatalog({ type: 'search', value: q });
+      else this.showCatalog();
     }
   },
 

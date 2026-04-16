@@ -36,6 +36,8 @@ Object.assign(app, {
       // Show logout button now that a password is set
       const logoutBtn = document.getElementById('logoutBtn');
       if (logoutBtn) logoutBtn.style.display = '';
+      const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
+      if (mobileLogoutBtn) mobileLogoutBtn.style.display = '';
     } catch(e) { /* toast shown */ }
   },
 
@@ -57,6 +59,8 @@ Object.assign(app, {
       this.toast('Password removed — app is now open access');
       const logoutBtn = document.getElementById('logoutBtn');
       if (logoutBtn) logoutBtn.style.display = 'none';
+      const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
+      if (mobileLogoutBtn) mobileLogoutBtn.style.display = 'none';
     } catch(e) { /* toast shown */ }
   }
 });

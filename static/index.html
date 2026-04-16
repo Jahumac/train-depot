@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Train Depot</title>
-  <link rel="stylesheet" href="/css/styles.css?v=23">
+  <link rel="stylesheet" href="/css/styles.css?v=24">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚂</text></svg>">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1b4332">
@@ -44,9 +44,37 @@
           <span>🔒</span>
         </button>
       </div>
-      <button class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</button>
+      <button class="menu-toggle" onclick="app.toggleMobileMenu()" aria-label="Open menu">☰</button>
     </div>
   </header>
+
+  <!-- Mobile drawer (shown only on small screens) -->
+  <div class="mobile-drawer-backdrop" id="mobileDrawerBackdrop" onclick="app.closeMobileMenu()"></div>
+  <aside class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+    <div class="mobile-drawer-header">
+      <span class="mobile-drawer-title">Menu</span>
+      <button class="mobile-drawer-close" onclick="app.closeMobileMenu()" aria-label="Close menu">&times;</button>
+    </div>
+    <div class="mobile-drawer-search">
+      <input type="text" id="mobileSearch" placeholder="Search collection..." onkeyup="app.handleMobileSearch(event)">
+    </div>
+    <nav class="mobile-drawer-nav">
+      <a href="#" onclick="app.showLanding(); app.closeMobileMenu(); return false;">🏠 Home</a>
+      <a href="#" onclick="app.showCatalog(); app.closeMobileMenu(); return false;">📚 Catalog</a>
+      <a href="#" onclick="app.showDashboard(); app.closeMobileMenu(); return false;">📊 Dashboard</a>
+      <a href="#" onclick="app.showBackup(); app.closeMobileMenu(); return false;">⚙️ Settings</a>
+    </nav>
+    <div class="mobile-drawer-actions">
+      <button class="mobile-drawer-action" onclick="app.toggleTheme()">
+        <span class="theme-icon" id="mobileThemeIcon">🌙</span>
+        <span>Toggle theme</span>
+      </button>
+      <button class="mobile-drawer-action" onclick="app.logout()" id="mobileLogoutBtn" style="display:none;">
+        <span>🔒</span>
+        <span>Sign out</span>
+      </button>
+    </div>
+  </aside>
 
   <!-- Stats Bar -->
   <div class="stats-bar" id="statsBar" style="display:none;">
@@ -251,9 +279,9 @@
   </footer>
 
   <script src="/js/reference-db.js?v=4"></script>
-  <script src="/js/app.js?v=20"></script>
+  <script src="/js/app.js?v=21"></script>
   <script src="/js/modals.js?v=2"></script>
-  <script src="/js/auth.js?v=2"></script>
+  <script src="/js/auth.js?v=3"></script>
   <script src="/js/catalog.js?v=2"></script>
   <script src="/js/detail.js?v=2"></script>
   <script src="/js/form.js?v=1"></script>

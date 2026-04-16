@@ -217,6 +217,136 @@ img { max-width: 100%; height: auto; }
   padding: 8px;
 }
 
+/* --- Mobile Drawer --- */
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 86%;
+  max-width: 340px;
+  height: 100vh;
+  background: var(--color-bg-card);
+  box-shadow: -4px 0 20px rgba(0,0,0,0.4);
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  visibility: hidden;
+}
+.mobile-drawer.open {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+.mobile-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  z-index: 1999;
+}
+.mobile-drawer-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+body.drawer-open { overflow: hidden; }
+
+.mobile-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+.mobile-drawer-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--color-text);
+}
+.mobile-drawer-close {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--color-text-light);
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.mobile-drawer-search {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+.mobile-drawer-search input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+.mobile-drawer-search input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--focus-ring, rgba(201,162,39,0.15));
+}
+
+.mobile-drawer-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  flex: 1;
+}
+.mobile-drawer-nav a {
+  padding: 14px 20px;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 500;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: background 0.15s ease;
+}
+.mobile-drawer-nav a:hover,
+.mobile-drawer-nav a.active {
+  background: var(--color-bg-hover);
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.mobile-drawer-actions {
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mobile-drawer-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.mobile-drawer-action:hover {
+  background: var(--color-bg-hover);
+}
+
 /* --- Hero / Landing --- */
 .hero {
   position: relative;
@@ -427,6 +557,51 @@ img { max-width: 100%; height: auto; }
 
 .stat-tag.accent .stat-value { color: var(--color-accent-dark); }
 [data-theme="dark"] .stat-tag.accent .stat-value { color: var(--color-accent-light); }
+
+/* Stats breakdown toggle — hidden on desktop (pills shown inline), shown on mobile */
+.stats-breakdown-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-bg);
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.stats-breakdown-toggle:hover {
+  border-color: var(--color-accent);
+}
+
+.stats-breakdown-toggle .stat-icon {
+  font-size: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.stats-breakdown-toggle.open .stat-icon {
+  transform: rotate(180deg);
+}
+
+.stats-breakdown-count {
+  background: var(--color-primary);
+  color: white;
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.stats-breakdown {
+  display: contents;
+}
 
 /* --- Main Content --- */
 .main-content {
@@ -1490,23 +1665,17 @@ img { max-width: 100%; height: auto; }
 @media (max-width: 768px) {
   .header-inner { padding: 0 16px; }
 
+  /* Hide everything except the logo and hamburger — rest lives in the drawer */
   .nav-links { display: none; }
-  .nav-links.open {
-    display: flex;
-    flex-direction: column;
-    position: absolute;
-    top: 64px;
-    left: 0;
-    right: 0;
-    background: var(--color-primary-dark);
-    padding: 8px;
-    box-shadow: var(--shadow-md);
-  }
+  .header-right { display: none; }
 
   .menu-toggle { display: block; }
 
-  .nav-search input { width: 140px; }
-  .nav-search input:focus { width: 180px; }
+  /* Compact stats breakdown — categories collapse behind a single toggle */
+  .stats-inner { gap: 8px; }
+  .stats-breakdown-toggle { display: inline-flex; }
+  .stats-breakdown { display: none; flex-basis: 100%; gap: 8px; flex-wrap: wrap; }
+  .stats-breakdown.open { display: flex; }
 
   .hero-title { font-size: 2rem; }
   .hero-subtitle { font-size: 1rem; }
@@ -1691,9 +1860,7 @@ img { max-width: 100%; height: auto; }
   .valuation-stats { flex-direction: column; gap: 10px; }
   .valuation-stat { min-width: 100%; }
 
-  /* Header — tighter on phones so logo + controls don't overflow */
-  .nav-search input { width: 100px; }
-  .nav-search input:focus { width: 140px; }
+  /* Header — tighter on phones so logo doesn't eat the hamburger's space */
   .logo { font-size: 1.1rem; }
   .logo-icon { font-size: 1.3rem; }
 
