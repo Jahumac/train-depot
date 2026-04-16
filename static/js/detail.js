@@ -35,7 +35,7 @@ Object.assign(app, {
       <div class="main-content">
         <div class="item-detail">
           <div class="detail-header">
-            <a class="detail-back" onclick="app.showCatalog(app.currentFilter)">← Back to catalog</a>
+            <a class="detail-back" onclick="app.showCatalog(app.currentFilter)">Back to catalog</a>
             <div class="detail-actions">
               <button class="btn btn-outline btn-sm" onclick="app.showQRForItem('${item.id}')">📱 QR</button>
               <button class="btn btn-outline btn-sm" onclick="app.openEditModal('${item.id}')">✏️ Edit</button>
