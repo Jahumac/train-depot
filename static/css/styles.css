@@ -1056,10 +1056,26 @@ body.drawer-open { overflow: hidden; }
   border-radius: var(--radius-md);
   overflow: hidden;
   margin-bottom: 12px;
-  min-height: 240px;
+  min-height: 360px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Blurred backdrop — fills the hero with a soft, out-of-focus version of
+   the same photo so portrait shots no longer float inside a dark void.
+   --hero-bg is set inline on the element by the renderer. */
+.detail-main-image.has-hero-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--hero-bg);
+  background-size: cover;
+  background-position: center;
+  filter: blur(28px) brightness(0.55) saturate(1.05);
+  transform: scale(1.15);
+  z-index: 0;
+  pointer-events: none;
 }
 
 .detail-main-image img {
@@ -1067,9 +1083,17 @@ body.drawer-open { overflow: hidden; }
   width: auto;
   height: auto;
   max-width: 100%;
-  max-height: 520px;
+  max-height: 560px;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
 }
+
+/* Keep corner overlays above the blurred backdrop */
+.detail-main-image .detail-hero-wishlist,
+.detail-main-image .detail-hero-service,
+.detail-main-image .detail-hero-nameplate { z-index: 2; }
 
 .detail-main-placeholder {
   width: 100%;

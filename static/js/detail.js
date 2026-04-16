@@ -15,9 +15,13 @@ Object.assign(app, {
     if (!item) return '<div class="main-content"><p>Item not found</p></div>';
 
     this.currentLightboxIndex = 0;
-    const mainImg = item.images && item.images.length > 0
-      ? `<img src="${item.images[0]}" id="detailMainImg" alt="${this.esc(item.name)}" onclick="app.openLightbox(0)" style="cursor:pointer;">`
+    const firstImgUrl = item.images && item.images.length > 0 ? item.images[0] : null;
+    const mainImg = firstImgUrl
+      ? `<img src="${firstImgUrl}" id="detailMainImg" alt="${this.esc(item.name)}" onclick="app.openLightbox(0)" style="cursor:pointer;">`
       : `<div class="detail-main-placeholder">${this.categorySilhouette(item.categoryId)}</div>`;
+    // Inline CSS custom property powers the blurred hero backdrop that fills
+    // the container behind portrait photos so they don't look marooned.
+    const heroBgStyle = firstImgUrl ? ` style="--hero-bg: url('${firstImgUrl}');"` : '';
 
     const catName = this.getCategoryName(item.categoryId);
     const subcatName = this.getSubcategoryName(item.subcategoryId);
@@ -44,7 +48,7 @@ Object.assign(app, {
           </div>
           <div class="detail-body">
             <div class="detail-images">
-              <div class="detail-main-image">
+              <div class="detail-main-image${firstImgUrl ? ' has-hero-bg' : ''}"${heroBgStyle}>
                 ${mainImg}
                 ${item.wishlist ? '<span class="detail-hero-wishlist" title="Wishlist">⭐</span>' : ''}
                 ${serviceOverdue ? '<span class="detail-hero-service" title="Service overdue">🔧</span>' : ''}
@@ -173,6 +177,9 @@ Object.assign(app, {
   switchImage(src, thumbEl) {
     const mainImg = document.getElementById('detailMainImg');
     if (mainImg) mainImg.src = src;
+    // Sync the blurred backdrop with the newly-selected main image
+    const heroBox = mainImg ? mainImg.closest('.detail-main-image') : null;
+    if (heroBox) heroBox.style.setProperty('--hero-bg', `url('${src}')`);
     document.querySelectorAll('.detail-thumb').forEach(t => t.classList.remove('active'));
     if (thumbEl) thumbEl.classList.add('active');
   },

@@ -144,9 +144,15 @@ Object.assign(app, {
 
           <div style="display:grid; gap:24px;">
             <div class="backup-panel">
-              <h3>📤 Export Catalogue</h3>
-              <p>Download your entire collection as a JSON file. This includes all item data (images are stored separately on the server).</p>
-              <button class="btn btn-primary" onclick="app.exportData()">Download Backup</button>
+              <h3>📦 Full Backup (with photos)</h3>
+              <p>Download a complete ZIP archive containing all catalogue data <strong>and every uploaded photo</strong>. Use this for offsite or long-term backup.</p>
+              <button class="btn btn-primary" onclick="app.exportFullBackup()">Download Full Backup (.zip)</button>
+            </div>
+
+            <div class="backup-panel">
+              <h3>📤 Export Catalogue (data only)</h3>
+              <p>Download a JSON file of all item data. Smaller than the full backup, but does not include photo files — use the Full Backup above if you want those too.</p>
+              <button class="btn btn-outline" onclick="app.exportData()">Download JSON Backup</button>
             </div>
 
             <div class="backup-panel">
@@ -200,6 +206,11 @@ Object.assign(app, {
   exportData() {
     window.location.href = '/api/export';
     this.toast('Backup download started');
+  },
+
+  exportFullBackup() {
+    window.location.href = '/api/export/full';
+    this.toast('Full backup (with photos) packaging \u2014 this may take a moment');
   },
 
   async importData(event) {

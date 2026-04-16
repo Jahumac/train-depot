@@ -186,6 +186,100 @@ function parseJsonBody(buffer) {
   }
 }
 
+// === Zero-dependency ZIP writer (STORED / no compression) ===
+// Handles in-memory archives up to ~2 GB — fine for a photo library backup.
+// Photos are already JPEG/PNG compressed so STORED keeps the implementation
+// tiny with no meaningful size penalty.
+const ZIP_CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    table[i] = c;
+  }
+  return table;
+})();
+
+function zipCrc32(buf) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) {
+    c = ZIP_CRC32_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  }
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function createZipBuffer(files) {
+  // files: [{ name: string, data: Buffer }]
+  const chunks = [];
+  const entries = [];
+  let offset = 0;
+
+  const now = new Date();
+  const dosTime = ((now.getHours() & 0x1F) << 11) | ((now.getMinutes() & 0x3F) << 5) | ((now.getSeconds() >>> 1) & 0x1F);
+  const dosDate = (((now.getFullYear() - 1980) & 0x7F) << 9) | (((now.getMonth() + 1) & 0x0F) << 5) | (now.getDate() & 0x1F);
+
+  for (const f of files) {
+    const nameBuf = Buffer.from(f.name, 'utf8');
+    const size = f.data.length;
+    const crc = zipCrc32(f.data);
+
+    const lfh = Buffer.alloc(30);
+    lfh.writeUInt32LE(0x04034b50, 0);
+    lfh.writeUInt16LE(20, 4);
+    lfh.writeUInt16LE(0x0800, 6);   // flag bit 11 = UTF-8 names
+    lfh.writeUInt16LE(0, 8);        // STORED
+    lfh.writeUInt16LE(dosTime, 10);
+    lfh.writeUInt16LE(dosDate, 12);
+    lfh.writeUInt32LE(crc, 14);
+    lfh.writeUInt32LE(size, 18);
+    lfh.writeUInt32LE(size, 22);
+    lfh.writeUInt16LE(nameBuf.length, 26);
+    lfh.writeUInt16LE(0, 28);
+
+    chunks.push(lfh, nameBuf, f.data);
+    entries.push({ nameBuf, crc, size, offset, dosTime, dosDate });
+    offset += 30 + nameBuf.length + size;
+  }
+
+  const cdStart = offset;
+  for (const e of entries) {
+    const cd = Buffer.alloc(46);
+    cd.writeUInt32LE(0x02014b50, 0);
+    cd.writeUInt16LE(20, 4);
+    cd.writeUInt16LE(20, 6);
+    cd.writeUInt16LE(0x0800, 8);
+    cd.writeUInt16LE(0, 10);
+    cd.writeUInt16LE(e.dosTime, 12);
+    cd.writeUInt16LE(e.dosDate, 14);
+    cd.writeUInt32LE(e.crc, 16);
+    cd.writeUInt32LE(e.size, 20);
+    cd.writeUInt32LE(e.size, 24);
+    cd.writeUInt16LE(e.nameBuf.length, 28);
+    cd.writeUInt16LE(0, 30);
+    cd.writeUInt16LE(0, 32);
+    cd.writeUInt16LE(0, 34);
+    cd.writeUInt16LE(0, 36);
+    cd.writeUInt32LE(0, 38);
+    cd.writeUInt32LE(e.offset, 42);
+    chunks.push(cd, e.nameBuf);
+    offset += 46 + e.nameBuf.length;
+  }
+  const cdSize = offset - cdStart;
+
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(cdSize, 12);
+  eocd.writeUInt32LE(cdStart, 16);
+  eocd.writeUInt16LE(0, 20);
+  chunks.push(eocd);
+
+  return Buffer.concat(chunks);
+}
+
 /**
  * Parse multipart form data (for image uploads)
  */
@@ -756,6 +850,37 @@ async function handleApiRequest(req, res, pathname) {
       'Content-Disposition': `attachment; filename="${db.getSettings().appName.toLowerCase().replace(/\s+/g, '-')}-backup.json"`
     });
     return res.end(data);
+  }
+
+  // GET /api/export/full — ZIP archive with data.json + every uploaded photo
+  if (pathname === '/api/export/full' && req.method === 'GET') {
+    try {
+      const files = [
+        { name: 'data.json', data: Buffer.from(db.exportData()) }
+      ];
+      if (fs.existsSync(UPLOAD_DIR)) {
+        for (const filename of fs.readdirSync(UPLOAD_DIR)) {
+          const filePath = path.join(UPLOAD_DIR, filename);
+          try {
+            const stat = fs.statSync(filePath);
+            if (stat.isFile()) {
+              files.push({ name: 'uploads/' + filename, data: fs.readFileSync(filePath) });
+            }
+          } catch { /* skip unreadable files */ }
+        }
+      }
+      const zipBuf = createZipBuffer(files);
+      const appName = db.getSettings().appName.toLowerCase().replace(/\s+/g, '-');
+      const timestamp = new Date().toISOString().slice(0, 10);
+      res.writeHead(200, {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${appName}-full-backup-${timestamp}.zip"`,
+        'Content-Length': zipBuf.length
+      });
+      return res.end(zipBuf);
+    } catch (e) {
+      return sendError(res, 500, 'Failed to build full backup: ' + e.message);
+    }
   }
 
   // POST /api/import
