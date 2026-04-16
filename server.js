@@ -39,12 +39,46 @@ const MIME_TYPES = {
   '.webmanifest': 'application/manifest+json'
 };
 
-// ==================== Session Store ====================
+// ==================== Session Store (disk-backed) ====================
 
+const SESSIONS_FILE = path.join(__dirname, 'data', 'sessions.json');
 const sessions = new Map();
+
+// Load persisted sessions from disk on startup
+(function loadSessions() {
+  try {
+    if (fs.existsSync(SESSIONS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+      const now = Date.now();
+      for (const [token, session] of Object.entries(data)) {
+        if (session.expires > now) sessions.set(token, session);
+      }
+    }
+  } catch { /* corrupt file — start fresh */ }
+})();
+
+function saveSessions() {
+  try {
+    const obj = Object.fromEntries(sessions);
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(obj), 'utf8');
+  } catch { /* non-fatal — sessions still work in memory */ }
+}
 
 function generateSessionToken() {
   return crypto.randomBytes(32).toString('hex');
+}
+
+function setSessionCookie(res, token, maxAgeSec) {
+  const parts = [
+    `session=${token}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Strict',
+    `Max-Age=${maxAgeSec}`
+  ];
+  // Secure flag — always on in production (behind HTTPS reverse proxy)
+  if (process.env.NODE_ENV !== 'development') parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
 }
 
 function createSession(res) {
@@ -54,14 +88,21 @@ function createSession(res) {
     created: Date.now(),
     expires: Date.now() + SESSION_MAX_AGE
   });
-  res.setHeader('Set-Cookie', `session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAgeSec}`);
+  setSessionCookie(res, token, maxAgeSec);
+  saveSessions();
   return token;
 }
 
 function destroySession(req, res) {
   const token = getSessionToken(req);
   if (token) sessions.delete(token);
-  res.setHeader('Set-Cookie', 'session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0');
+  setSessionCookie(res, '', 0);
+  saveSessions();
+}
+
+function destroyAllSessions() {
+  sessions.clear();
+  saveSessions();
 }
 
 function getSessionToken(req) {
@@ -77,23 +118,53 @@ function isValidSession(req) {
   if (!session) return false;
   if (session.expires < Date.now()) {
     sessions.delete(token);
+    saveSessions();
     return false;
   }
   return true;
 }
 
+// ==================== Local-Network Trust ====================
+
+// RFC 1918 / loopback ranges — requests from these IPs skip password.
+// Behind NPM (reverse proxy), the real client IP arrives via X-Forwarded-For.
+function getClientIp(req) {
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) return xff.split(',')[0].trim();
+  return req.socket.remoteAddress || '';
+}
+
+function isPrivateIp(ip) {
+  // Normalise IPv4-mapped-IPv6 (::ffff:192.168.1.1 → 192.168.1.1)
+  const v4 = ip.replace(/^::ffff:/, '');
+  if (v4 === '127.0.0.1' || ip === '::1') return true;
+  const parts = v4.split('.').map(Number);
+  if (parts.length !== 4) return false;
+  // 10.0.0.0/8
+  if (parts[0] === 10) return true;
+  // 172.16.0.0/12
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  // 192.168.0.0/16
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  return false;
+}
+
 function isAuthenticated(req) {
   // If no password is set, everything is open
   if (!db.hasPassword()) return true;
+  // Local network is always trusted (homelab convenience)
+  if (isPrivateIp(getClientIp(req))) return true;
   return isValidSession(req);
 }
 
 // Clean up expired sessions every hour
 setInterval(() => {
   const now = Date.now();
+  let changed = false;
   for (const [token, session] of sessions) {
-    if (session.expires < now) sessions.delete(token);
+    if (session.expires < now) { sessions.delete(token); changed = true; }
   }
+  if (changed) saveSessions();
 }, 60 * 60 * 1000);
 
 // ==================== Rate Limiter ====================
@@ -492,7 +563,10 @@ async function handleAuthRequest(req, res, pathname) {
     }
 
     db.setPassword(data.newPassword);
-    return sendJson(res, 200, { message: 'Password changed' });
+    // Invalidate every other session, then re-issue for the current user
+    destroyAllSessions();
+    createSession(res);
+    return sendJson(res, 200, { message: 'Password changed — all other sessions signed out' });
   }
 
   // POST /api/auth/remove-password
