@@ -110,9 +110,14 @@ Object.assign(app, {
     const filterTitle = this.getFilterTitle();
     return `
       <div class="main-content">
+        <div class="sidebar-drawer-backdrop" id="sidebarDrawerBackdrop" onclick="app.closeSidebarDrawer()"></div>
         <div class="catalog-layout">
           ${this.renderSidebar()}
           <div class="catalog-main">
+            <button class="sidebar-drawer-trigger" onclick="app.openSidebarDrawer()" aria-label="Open categories and filters">
+              <span class="stat-icon">📂</span>
+              <span>Categories &amp; Tags</span>
+            </button>
             ${this.renderMobileTagBar()}
             ${this.renderFilterPanel()}
             <div class="items-header">
@@ -151,6 +156,7 @@ Object.assign(app, {
     const allTags = this.getAllTagsForSidebar();
     return `
       <aside class="sidebar">
+        <button class="sidebar-drawer-close" onclick="app.closeSidebarDrawer()" aria-label="Close filters">×</button>
         <div class="sidebar-title">Categories</div>
         <ul class="category-list">
           <li class="subcategory-item ${!this.currentFilter && !this.showWishlistOnly ? 'active' : ''}"

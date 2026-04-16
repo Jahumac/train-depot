@@ -611,6 +611,11 @@ const app = {
     document.getElementById('statsBar').style.display = '';
     this.render();
 
+    // Auto-close the mobile sidebar drawer when a filter is picked
+    document.body.classList.remove('drawer-open');
+    const sidebarDrawerBackdrop = document.getElementById('sidebarDrawerBackdrop');
+    if (sidebarDrawerBackdrop) sidebarDrawerBackdrop.classList.remove('open');
+
     // Restore scroll position if returning from a detail view
     if (this.catalogScrollY != null) {
       window.scrollTo({ top: this.catalogScrollY, behavior: 'instant' });
@@ -803,6 +808,24 @@ const app = {
       if (q) this.showCatalog({ type: 'search', value: q });
       else this.showCatalog();
     }
+  },
+
+  // ==================== Sidebar Drawer (mobile) ====================
+  openSidebarDrawer() {
+    const sidebar = document.querySelector('.catalog-layout .sidebar');
+    const backdrop = document.getElementById('sidebarDrawerBackdrop');
+    if (!sidebar) return;
+    sidebar.classList.add('drawer-open');
+    if (backdrop) backdrop.classList.add('open');
+    document.body.classList.add('drawer-open');
+  },
+
+  closeSidebarDrawer() {
+    const sidebar = document.querySelector('.catalog-layout .sidebar');
+    const backdrop = document.getElementById('sidebarDrawerBackdrop');
+    if (sidebar) sidebar.classList.remove('drawer-open');
+    if (backdrop) backdrop.classList.remove('open');
+    document.body.classList.remove('drawer-open');
   },
 
   // Image Viewer / Lightbox → moved to detail.js

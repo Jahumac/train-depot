@@ -347,6 +347,61 @@ body.drawer-open { overflow: hidden; }
   background: var(--color-bg-hover);
 }
 
+/* --- Sidebar Drawer (mobile catalog) --- */
+.sidebar-drawer-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.sidebar-drawer-backdrop.open {
+  display: block;
+  opacity: 1;
+}
+
+.sidebar-drawer-trigger {
+  display: none; /* shown only on mobile */
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar-drawer-trigger:hover {
+  border-color: var(--color-accent);
+}
+
+.sidebar-drawer-close {
+  display: none; /* shown only on mobile */
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 50%;
+  z-index: 2;
+}
+.sidebar-drawer-close:hover {
+  background: var(--color-bg-hover);
+}
+
 /* --- Hero / Landing --- */
 .hero {
   position: relative;
@@ -1683,10 +1738,32 @@ body.drawer-open { overflow: hidden; }
 
   .catalog-layout { grid-template-columns: 1fr; }
 
+  /* Sidebar becomes a left-side slide-in drawer on mobile.
+     Hidden off-canvas by default, slides in via .drawer-open. */
   .sidebar {
-    position: static;
-    margin-bottom: 16px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 86%;
+    max-width: 320px;
+    height: 100vh;
+    max-height: 100vh;
+    margin-bottom: 0;
+    border-radius: 0;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.4);
+    z-index: 1001;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+    padding-top: 48px; /* room for close button */
   }
+  .sidebar.drawer-open {
+    transform: translateX(0);
+  }
+
+  /* Trigger button above the items list — opens the drawer */
+  .sidebar-drawer-trigger { display: flex; }
+  .sidebar-drawer-close { display: flex; align-items: center; justify-content: center; }
 
   .detail-body { grid-template-columns: 1fr; }
 
@@ -1704,6 +1781,12 @@ body.drawer-open { overflow: hidden; }
 
   .main-content { padding: 16px; }
   .stats-inner { padding: 0 16px; }
+
+  /* Catalog right-side safety — prevent children from leaking past the viewport */
+  .catalog-layout, .catalog-main { min-width: 0; max-width: 100%; }
+  .catalog-main > * { max-width: 100%; box-sizing: border-box; }
+  .items-header, .items-header > * { min-width: 0; max-width: 100%; }
+  .items-title { overflow-wrap: break-word; word-break: break-word; }
 }
 
 @media (max-width: 480px) {
@@ -3026,7 +3109,8 @@ body.drawer-open { overflow: hidden; }
   border-radius: var(--radius-md);
   padding: 8px 10px;
   margin-bottom: 12px;
-  overflow: hidden;
+  max-width: 100%;
+  min-width: 0;
 }
 .mobile-tag-bar-label {
   font-size: 1rem;
@@ -3036,10 +3120,15 @@ body.drawer-open { overflow: hidden; }
   display: flex;
   gap: 6px;
   overflow-x: auto;
+  overflow-y: hidden;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-  flex: 1;
-  padding-bottom: 2px;
+  flex: 1 1 0;
+  min-width: 0;            /* critical: allow flex child to shrink so overflow triggers */
+  padding: 0 14px 2px 0;   /* trailing space so last chip doesn't kiss the card edge */
+  /* Subtle right-edge fade hints that there's more to swipe to */
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+          mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
 }
 .mobile-tag-bar-scroll::-webkit-scrollbar { height: 3px; }
 .mobile-tag-bar-scroll::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
