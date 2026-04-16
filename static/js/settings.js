@@ -150,16 +150,23 @@ Object.assign(app, {
             </div>
 
             <div class="backup-panel">
+              <h3>📥 Restore Full Backup (with photos)</h3>
+              <p>Restore a ZIP produced by <em>Full Backup</em> above — catalogue data and every photo will be put back in place. <strong>Warning:</strong> this replaces all current data and any photos with matching filenames.</p>
+              <input type="file" id="importFullFile" accept=".zip" style="display:none" onchange="app.importFullBackup(event)">
+              <button class="btn btn-outline" onclick="document.getElementById('importFullFile').click()">Choose ZIP File</button>
+            </div>
+
+            <div class="backup-panel">
               <h3>📤 Export Catalogue (data only)</h3>
               <p>Download a JSON file of all item data. Smaller than the full backup, but does not include photo files — use the Full Backup above if you want those too.</p>
               <button class="btn btn-outline" onclick="app.exportData()">Download JSON Backup</button>
             </div>
 
             <div class="backup-panel">
-              <h3>📥 Import / Restore</h3>
-              <p>Restore from a previously exported backup file. <strong>Warning:</strong> this will replace all current data.</p>
+              <h3>📥 Import JSON (data only)</h3>
+              <p>Restore from a JSON-only backup file. <strong>Warning:</strong> this will replace all current data. Photos are not affected.</p>
               <input type="file" id="importFile" accept=".json" style="display:none" onchange="app.importData(event)">
-              <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">Choose Backup File</button>
+              <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">Choose JSON Backup File</button>
             </div>
 
             <div class="backup-panel">
@@ -229,6 +236,35 @@ Object.assign(app, {
       await this.loadStats();
       this.showCatalog();
     } catch (e) { /* toast shown */ }
+    event.target.value = '';
+  },
+
+  async importFullBackup(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const ok = await this.showConfirmModal({
+      title: 'Restore full backup?',
+      message: `<strong>${this.esc(file.name)}</strong> will replace all catalogue data and overwrite any photos with matching filenames. This can\u2019t be undone \u2014 make sure you have a recent backup first.`,
+      confirmText: 'Restore backup',
+      confirmClass: 'btn-primary',
+      icon: '📦'
+    });
+    if (!ok) { event.target.value = ''; return; }
+
+    const form = new FormData();
+    form.append('file', file, file.name);
+    this.toast('Unpacking backup \u2014 this may take a moment\u2026');
+
+    try {
+      const res = await fetch('/api/import/full', { method: 'POST', body: form });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Restore failed');
+      this.toast(`All aboard \u2014 restored with ${json.photos || 0} photo${json.photos === 1 ? '' : 's'}!`);
+      // Reload so service worker + stale state are flushed end-to-end
+      setTimeout(() => window.location.reload(), 400);
+    } catch (e) {
+      this.toast('Restore failed: ' + e.message, 'error');
+    }
     event.target.value = '';
   },
 

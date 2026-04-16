@@ -208,6 +208,55 @@ function zipCrc32(buf) {
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
 
+// Reads a PKZIP archive from a Buffer and returns [{name, data:Buffer}].
+// Supports STORED (method 0) and DEFLATE (method 8 via zlib.inflateRaw).
+// Sufficient for archives we produce ourselves and anything re-zipped with
+// Finder / 7-Zip / the `zip` command.
+function parseZipBuffer(buf) {
+  // Locate EOCD record — scan back up to 64KB + 22 bytes for signature 0x06054b50
+  let eocd = -1;
+  const minEocd = Math.max(0, buf.length - 65558);
+  for (let i = buf.length - 22; i >= minEocd; i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('Not a valid ZIP (no end-of-central-directory record)');
+
+  const totalEntries = buf.readUInt16LE(eocd + 10);
+  const cdOffset = buf.readUInt32LE(eocd + 16);
+
+  const files = [];
+  let p = cdOffset;
+  for (let e = 0; e < totalEntries; e++) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) throw new Error('Corrupt central-directory entry #' + e);
+    const method   = buf.readUInt16LE(p + 10);
+    const compSize = buf.readUInt32LE(p + 20);
+    const nameLen  = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const commLen  = buf.readUInt16LE(p + 32);
+    const localOff = buf.readUInt32LE(p + 42);
+    const name = buf.slice(p + 46, p + 46 + nameLen).toString('utf8');
+    p += 46 + nameLen + extraLen + commLen;
+
+    // Skip directory entries (names ending in /)
+    if (name.endsWith('/')) continue;
+
+    // Read local file header to learn the actual file-data offset
+    if (buf.readUInt32LE(localOff) !== 0x04034b50) throw new Error('Corrupt local header for ' + name);
+    const lfhNameLen  = buf.readUInt16LE(localOff + 26);
+    const lfhExtraLen = buf.readUInt16LE(localOff + 28);
+    const dataStart   = localOff + 30 + lfhNameLen + lfhExtraLen;
+    const compressed  = buf.slice(dataStart, dataStart + compSize);
+
+    let data;
+    if (method === 0)      data = compressed;
+    else if (method === 8) data = require('zlib').inflateRawSync(compressed);
+    else throw new Error('Unsupported compression method ' + method + ' in ' + name);
+
+    files.push({ name, data });
+  }
+  return files;
+}
+
 function createZipBuffer(files) {
   // files: [{ name: string, data: Buffer }]
   const chunks = [];
@@ -907,6 +956,63 @@ async function handleApiRequest(req, res, pathname) {
     } catch (e) {
       return sendError(res, 400, 'Invalid backup file: ' + e.message);
     }
+  }
+
+  // POST /api/import/full — restore data.json + uploads/* from a full-backup ZIP
+  if (pathname === '/api/import/full' && req.method === 'POST') {
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('multipart')) {
+      return sendError(res, 400, 'Expected multipart/form-data with a ZIP file');
+    }
+    const boundaryMatch = contentType.match(/boundary=(.+)/);
+    if (!boundaryMatch) return sendError(res, 400, 'Missing multipart boundary');
+
+    let zipBuf;
+    try {
+      const body = await readBody(req);
+      const parts = parseMultipart(body, boundaryMatch[1]);
+      const filePart = parts.find(p => p.filename);
+      if (!filePart) return sendError(res, 400, 'No file uploaded');
+      zipBuf = filePart.data;
+    } catch (e) {
+      return sendError(res, 400, 'Could not read upload: ' + e.message);
+    }
+
+    let entries;
+    try {
+      entries = parseZipBuffer(zipBuf);
+    } catch (e) {
+      return sendError(res, 400, 'Invalid ZIP archive: ' + e.message);
+    }
+
+    const dataEntry = entries.find(e => e.name === 'data.json');
+    if (!dataEntry) return sendError(res, 400, 'ZIP is missing data.json — not a Train Depot full backup');
+
+    try {
+      db.importData(dataEntry.data.toString('utf8'));
+    } catch (e) {
+      return sendError(res, 400, 'Invalid data.json inside ZIP: ' + e.message);
+    }
+
+    // Restore photos. Use basename only — guard against path-traversal.
+    if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    let photoCount = 0;
+    for (const entry of entries) {
+      if (entry.name === 'data.json') continue;
+      if (entry.name.endsWith('/')) continue;
+      if (!entry.name.startsWith('uploads/')) continue;
+      const safeName = path.basename(entry.name);
+      if (!safeName || safeName === '.' || safeName === '..') continue;
+      try {
+        fs.writeFileSync(path.join(UPLOAD_DIR, safeName), entry.data);
+        photoCount++;
+      } catch { /* skip unwriteable files */ }
+    }
+
+    return sendJson(res, 200, {
+      message: 'Full backup restored successfully',
+      photos: photoCount
+    });
   }
 
   // === Share Link Management ===
