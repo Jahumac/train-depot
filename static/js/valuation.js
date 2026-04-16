@@ -346,10 +346,10 @@ Object.assign(app, {
           <canvas id="chartTimeline" width="800" height="250"></canvas>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
-          <div class="dashboard-chart-container">
+        <div class="dashboard-charts-grid">
+          <div class="dashboard-chart-container dashboard-span-2">
             <div class="dashboard-chart-title">By Manufacturer</div>
-            <canvas id="chartManufacturer" width="400" height="300"></canvas>
+            <canvas id="chartManufacturer" width="800" height="300"></canvas>
           </div>
 
           <div class="dashboard-chart-container">
@@ -362,7 +362,7 @@ Object.assign(app, {
             <canvas id="chartDccStatus" width="400" height="300"></canvas>
           </div>
 
-          <div class="dashboard-list">
+          <div class="dashboard-list dashboard-span-2">
             <div class="dashboard-list-title">Top 5 Valuable Items</div>
             <div>
               ${topItems.length > 0 ? topItems.map(item => `
