@@ -782,6 +782,28 @@ const app = {
     }
   },
 
+  // Live search — fires on every input event, debounced to 250ms so we
+  // don't thrash the server on each keystroke. Preserves focus because the
+  // nav search input lives outside the re-rendered #mainContent area.
+  handleSearchLive(event) {
+    const q = event.target.value.trim();
+    this._liveSearchQuery = q;
+    clearTimeout(this._liveSearchTimer);
+    this._liveSearchTimer = setTimeout(() => {
+      // Ignore if user already typed further while waiting
+      if (q !== this._liveSearchQuery) return;
+      const currentSearch = this.currentFilter && this.currentFilter.type === 'search'
+        ? this.currentFilter.value : '';
+      if (q === currentSearch) return;
+      if (q.length === 0) {
+        // Empty query only clears if we were actively searching
+        if (currentSearch) this.showCatalog();
+      } else {
+        this.showCatalog({ type: 'search', value: q });
+      }
+    }, 250);
+  },
+
   // ==================== Mobile Drawer ====================
   toggleMobileMenu() {
     const drawer = document.getElementById('mobileDrawer');

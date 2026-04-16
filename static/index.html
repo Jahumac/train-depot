@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Train Depot</title>
-  <link rel="stylesheet" href="/css/styles.css?v=31">
+  <link rel="stylesheet" href="/css/styles.css?v=32">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚂</text></svg>">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1b4332">
@@ -35,7 +35,7 @@
       </ul>
       <div class="header-right">
         <div class="nav-search">
-          <input type="text" id="globalSearch" placeholder="Search collection..." onkeyup="app.handleSearch(event)">
+          <input type="text" id="globalSearch" placeholder="Search collection..." oninput="app.handleSearchLive(event)" onkeyup="app.handleSearch(event)">
         </div>
         <button class="theme-toggle" onclick="app.toggleTheme()" title="Toggle dark mode">
           <span class="theme-icon" id="themeIcon">🌙</span>
@@ -56,7 +56,7 @@
       <button class="mobile-drawer-close" onclick="app.closeMobileMenu()" aria-label="Close menu">&times;</button>
     </div>
     <div class="mobile-drawer-search">
-      <input type="text" id="mobileSearch" placeholder="Search collection..." onkeyup="app.handleMobileSearch(event)">
+      <input type="text" id="mobileSearch" placeholder="Search collection..." oninput="app.handleSearchLive(event)" onkeyup="app.handleMobileSearch(event)">
     </div>
     <nav class="mobile-drawer-nav">
       <a href="#" onclick="app.showLanding(); app.closeMobileMenu(); return false;">🏠 Home</a>
@@ -284,10 +284,10 @@
   </footer>
 
   <script src="/js/reference-db.js?v=4"></script>
-  <script src="/js/app.js?v=22"></script>
+  <script src="/js/app.js?v=23"></script>
   <script src="/js/modals.js?v=2"></script>
   <script src="/js/auth.js?v=3"></script>
-  <script src="/js/catalog.js?v=3"></script>
+  <script src="/js/catalog.js?v=4"></script>
   <script src="/js/detail.js?v=4"></script>
   <script src="/js/form.js?v=1"></script>
   <script src="/js/valuation.js?v=3"></script>

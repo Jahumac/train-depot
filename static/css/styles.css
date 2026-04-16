@@ -935,6 +935,28 @@ body.drawer-open { overflow: hidden; }
   margin-top: 8px;
 }
 
+/* Search match hint — subtle line under price explaining why this item
+   matched (e.g. "matched in history: …steam locomotive rebuilt in…"). */
+.item-card-match-hint {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+.item-card-match-hint .match-hint-label {
+  color: var(--color-primary);
+  font-style: normal;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
 .item-card-price {
   font-weight: 700;
   color: var(--color-accent-dark);

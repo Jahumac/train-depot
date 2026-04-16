@@ -235,6 +235,12 @@ Object.assign(app, {
     const overdue = this.daysSinceService(item.lastServiceDate) > (this.settings.serviceIntervalDays || 365);
     const price = item.purchasePrice ? this.settings.currency + item.purchasePrice.toFixed(2) : '—';
     const manufacturer = item.manufacturer ? this.esc(item.manufacturer) : '';
+    // Match-hint — if we're viewing a search result, note which field matched
+    // so the user can see why an item came up (helps explain unexpected hits
+    // from historical-background or tag matches).
+    const matchHint = this.currentFilter && this.currentFilter.type === 'search'
+      ? this.describeSearchMatch(item, this.currentFilter.value)
+      : '';
     return `
       <div class="item-card" onclick="app.showDetail('${item.id}')">
         <div class="item-card-image">
@@ -250,6 +256,7 @@ Object.assign(app, {
             <span class="item-card-price">${price}</span>
             ${manufacturer ? `<span class="item-card-manufacturer">${manufacturer}</span>` : ''}
           </div>
+          ${matchHint ? `<div class="item-card-match-hint">${matchHint}</div>` : ''}
           ${this.renderValuationBadge(item) ? `<div class="item-card-valuation">${this.renderValuationBadge(item)}</div>` : ''}
           ${item.tags && item.tags.length > 0 ? `
             <div class="item-card-tags">
@@ -262,6 +269,48 @@ Object.assign(app, {
         </div>
       </div>
     `;
+  },
+
+  /**
+   * Describe which field on this item matched the given search query.
+   * Mirrors the server-side fields in database.searchItems, prioritised so
+   * the most specific/identifying match wins. Returns '' if no match found
+   * (defensive fallback — server already filtered, but a ranking tie might
+   * happen if none of these fields contain the query).
+   */
+  describeSearchMatch(item, query) {
+    if (!query) return '';
+    const q = query.toLowerCase();
+    const test = (v) => typeof v === 'string' && v.toLowerCase().includes(q);
+
+    if (test(item.name))            return this.buildMatchHint('name', item.name, q);
+    if (test(item.productCode))     return this.buildMatchHint('product code', item.productCode, q);
+    if (test(item.runningNumber))   return this.buildMatchHint('running number', item.runningNumber, q);
+    if (test(item.manufacturer))    return this.buildMatchHint('manufacturer', item.manufacturer, q);
+    if (test(item.livery))          return this.buildMatchHint('livery', item.livery, q);
+    if (item.tags && item.tags.some(t => typeof t === 'string' && t.toLowerCase().includes(q))) {
+      const tag = item.tags.find(t => typeof t === 'string' && t.toLowerCase().includes(q));
+      return this.buildMatchHint('tag', '#' + tag, q);
+    }
+    if (test(item.goesWellWith))    return this.buildMatchHint('goes well with', item.goesWellWith, q);
+    if (test(item.historicalBackground)) return this.buildMatchHint('history', item.historicalBackground, q);
+    return '';
+  },
+
+  /** Format a compact "matched in {field}: {snippet}" hint with a ~60-char window. */
+  buildMatchHint(fieldLabel, fullText, q) {
+    const lowered = fullText.toLowerCase();
+    const idx = lowered.indexOf(q);
+    const SNIPPET_LEN = 60;
+    let snippet;
+    if (fullText.length <= SNIPPET_LEN) {
+      snippet = fullText;
+    } else {
+      const start = Math.max(0, idx - 20);
+      const end = Math.min(fullText.length, start + SNIPPET_LEN);
+      snippet = (start > 0 ? '\u2026' : '') + fullText.slice(start, end) + (end < fullText.length ? '\u2026' : '');
+    }
+    return `<span class="match-hint-label">matched in ${fieldLabel}:</span> ${this.esc(snippet)}`;
   },
 
   /** SVG silhouette shown when an item has no photo yet. */
