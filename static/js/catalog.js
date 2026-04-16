@@ -233,9 +233,14 @@ Object.assign(app, {
   },
 
   renderItemCard(item) {
-    const img = item.images && item.images.length > 0
-      ? `<img src="${item.images[0]}" alt="${this.esc(item.name)}" loading="lazy">`
-      : `<div class="item-card-placeholder">${this.categorySilhouette(item.categoryId)}</div>`;
+    let img;
+    if (item.images && item.images.length > 0) {
+      const fp = item.imageFocalPoints && item.imageFocalPoints[item.images[0]];
+      const posStyle = fp ? ` style="object-position:${fp.x}% ${fp.y}%"` : '';
+      img = `<img src="${item.images[0]}" alt="${this.esc(item.name)}" loading="lazy"${posStyle}>`;
+    } else {
+      img = `<div class="item-card-placeholder">${this.categorySilhouette(item.categoryId)}</div>`;
+    }
     const subcatName = this.getSubcategoryName(item.subcategoryId);
     const overdue = this.daysSinceService(item.lastServiceDate) > (this.settings.serviceIntervalDays || 365);
     const price = item.purchasePrice ? this.settings.currency + item.purchasePrice.toFixed(2) : '—';

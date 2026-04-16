@@ -16,6 +16,7 @@ Object.assign(app, {
     this.selectedRefModel = null;
     this.pendingImages = [];
     this.existingImages = [];
+    this._focalPoints = {};
     document.getElementById('modalTitle').textContent = 'Add New Item';
     this.populateCategorySelects();
     this.clearForm();
@@ -41,6 +42,7 @@ Object.assign(app, {
     this.editingItem = item;
     this.pendingImages = [];
     this.existingImages = [...(item.images || [])];
+    this._focalPoints = item.imageFocalPoints ? { ...item.imageFocalPoints } : {};
 
     document.getElementById('modalTitle').textContent = 'Edit Item';
     this.populateCategorySelects(item.categoryId);
@@ -156,9 +158,11 @@ Object.assign(app, {
     this.existingImages.forEach((url, i) => {
       const div = document.createElement('div');
       div.className = 'upload-preview';
+      const hasFocal = this._focalPoints && this._focalPoints[url];
       div.innerHTML = `
         <img src="${url}" alt="Photo">
         <button class="upload-preview-remove" onclick="app.removeExistingImage(${i})">&times;</button>
+        <button class="upload-preview-focal ${hasFocal ? 'has-focal' : ''}" onclick="event.stopPropagation();app.openFocalPicker(${i})" title="Set thumbnail focus">📌</button>
       `;
       container.appendChild(div);
     });
@@ -250,7 +254,8 @@ Object.assign(app, {
         wishlistSpottedPrice: document.getElementById('formWishlistSpottedPrice')?.value || 0,
         wishlistSpottedAt: document.getElementById('formWishlistSpottedAt')?.value.trim() || '',
         tags: tags,
-        images: allImages
+        images: allImages,
+        imageFocalPoints: this._focalPoints || {}
       };
 
       if (this.editingItem) {
@@ -405,6 +410,77 @@ Object.assign(app, {
     if (event.key === 'Enter') {
       event.preventDefault();
       this.addTagFromInput();
+    }
+  },
+
+  // ==================== Focal Point Picker ====================
+
+  openFocalPicker(imageIndex) {
+    const url = this.existingImages[imageIndex];
+    if (!url) return;
+
+    const existing = this._focalPoints && this._focalPoints[url];
+
+    const overlay = document.createElement('div');
+    overlay.className = 'focal-picker-overlay';
+    overlay.innerHTML = `
+      <div class="focal-picker-container">
+        <p class="focal-picker-hint">Tap where the thumbnail should focus</p>
+        <div class="focal-picker-image-wrap">
+          <img src="${url}" class="focal-picker-img" alt="Pick focal point">
+          <div class="focal-picker-crosshair" style="${existing ? `left:${existing.x}%;top:${existing.y}%` : 'display:none'}"></div>
+        </div>
+        <div class="focal-picker-actions">
+          <button class="btn btn-outline btn-sm" onclick="app.closeFocalPicker(false)">Cancel</button>
+          ${existing ? '<button class="btn btn-outline btn-sm" onclick="app.clearFocalPoint()">Reset</button>' : ''}
+          <button class="btn btn-primary btn-sm" onclick="app.closeFocalPicker(true)">Set Focus</button>
+        </div>
+      </div>
+    `;
+
+    this._focalPickerUrl = url;
+    this._focalPickerValue = existing ? { ...existing } : null;
+
+    // Tap / click handler on the image
+    const imgWrap = overlay.querySelector('.focal-picker-image-wrap');
+    const crosshair = overlay.querySelector('.focal-picker-crosshair');
+    const setPoint = (e) => {
+      const rect = imgWrap.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const x = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+      const y = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
+      crosshair.style.left = x + '%';
+      crosshair.style.top = y + '%';
+      crosshair.style.display = '';
+      this._focalPickerValue = { x: Math.round(x), y: Math.round(y) };
+    };
+    imgWrap.addEventListener('click', setPoint);
+    imgWrap.addEventListener('touchstart', (e) => { e.preventDefault(); setPoint(e); }, { passive: false });
+
+    document.body.appendChild(overlay);
+    this._focalPickerOverlay = overlay;
+  },
+
+  clearFocalPoint() {
+    this._focalPickerValue = null;
+    const ch = this._focalPickerOverlay?.querySelector('.focal-picker-crosshair');
+    if (ch) ch.style.display = 'none';
+  },
+
+  closeFocalPicker(save) {
+    if (save && this._focalPickerUrl) {
+      if (this._focalPickerValue) {
+        if (!this._focalPoints) this._focalPoints = {};
+        this._focalPoints[this._focalPickerUrl] = this._focalPickerValue;
+      } else {
+        delete this._focalPoints[this._focalPickerUrl];
+      }
+      this.renderUploadPreviews();
+    }
+    if (this._focalPickerOverlay) {
+      this._focalPickerOverlay.remove();
+      this._focalPickerOverlay = null;
     }
   },
 

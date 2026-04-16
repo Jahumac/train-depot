@@ -475,6 +475,9 @@ const app = {
     this.initTheme();
     this.applyAppName();
     this.initKeyboardShortcuts();
+    window.addEventListener('popstate', (e) => this.handlePopState(e));
+    // Seed the initial history entry so the first back doesn't exit the app
+    history.replaceState({ view: 'landing' }, '', null);
     this.showLanding();
   },
 
@@ -577,11 +580,41 @@ const app = {
     document.getElementById('navLinks').classList.remove('open');
   },
 
+  // ==================== SPA History (back gesture / browser back) ====================
+
+  _pushingState: false,
+
+  /** Push a history entry so the browser back button / gesture stays in-app */
+  pushHistory(view, data) {
+    if (this._pushingState) return; // prevent re-entrance from popstate
+    const state = { view, ...data };
+    history.pushState(state, '', null);
+  },
+
+  /** Restore a view from a popstate event (browser back/forward) */
+  handlePopState(event) {
+    const state = event.state;
+    this._pushingState = true;
+    if (!state || state.view === 'landing') {
+      this.showLanding();
+    } else if (state.view === 'catalog') {
+      this.showCatalog(state.filter || null);
+    } else if (state.view === 'detail' && state.id) {
+      this.showDetail(state.id);
+    } else if (state.view === 'backup') {
+      this.showBackup();
+    } else {
+      this.showLanding();
+    }
+    this._pushingState = false;
+  },
+
   showLanding() {
     this.currentView = 'landing';
     this.setNav('home');
     document.getElementById('statsBar').style.display = 'none';
     this.render();
+    this.pushHistory('landing', {});
   },
 
   async showCatalog(filter = null) {
@@ -610,6 +643,7 @@ const app = {
     await this.loadStats();
     document.getElementById('statsBar').style.display = '';
     this.render();
+    this.pushHistory('catalog', { filter });
 
     // Auto-close the mobile sidebar drawer when a filter is picked
     document.body.classList.remove('drawer-open');
@@ -635,6 +669,7 @@ const app = {
       this.detailItem = await this.api(`/api/items/${id}`);
       this.render();
       window.scrollTo({ top: 0, behavior: 'instant' });
+      this.pushHistory('detail', { id });
     } catch (e) { /* toast already shown */ }
   },
 
@@ -643,6 +678,7 @@ const app = {
     this.setNav('backup');
     document.getElementById('statsBar').style.display = 'none';
     this.render();
+    this.pushHistory('backup', {});
     // Load share section async
     this.renderShareSection().then(html => {
       const el = document.getElementById('shareSection');
@@ -677,16 +713,25 @@ const app = {
   renderStats() {
     const s = this.stats;
     if (!s) return;
+    const c = this.settings.currency;
+    const fmt = (n) => n.toLocaleString('en-GB', { minimumFractionDigits: 2 });
     const bar = document.getElementById('statsContent');
     bar.innerHTML = `
+      <div class="stats-summary-line" onclick="app.toggleStatsExpand()">
+        📦 <span class="stat-value">${s.totalItems}</span> items
+        <span class="stat-sep">·</span>
+        💷 <span class="stat-value">${c}${fmt(s.totalSpent)}</span>
+        ${s.totalCurrentValue > 0 ? `<span class="stat-sep">·</span> 📈 <span class="stat-value">${c}${fmt(s.totalCurrentValue)}</span>` : ''}
+      </div>
+      <button class="stats-expand-toggle" onclick="app.toggleStatsExpand()" aria-label="Expand stats">▾</button>
       <span class="stat-tag accent">
         <span class="stat-icon">💷</span>
-        Spent: <span class="stat-value">${this.settings.currency}${s.totalSpent.toLocaleString('en-GB', {minimumFractionDigits:2})}</span>
+        Spent: <span class="stat-value">${c}${fmt(s.totalSpent)}</span>
       </span>
       ${s.totalCurrentValue > 0 ? `
       <span class="stat-tag accent">
         <span class="stat-icon">📈</span>
-        Value: <span class="stat-value">${this.settings.currency}${s.totalCurrentValue.toLocaleString('en-GB', {minimumFractionDigits:2})}</span>
+        Value: <span class="stat-value">${c}${fmt(s.totalCurrentValue)}</span>
       </span>
       ` : ''}
       <span class="stat-tag">
@@ -709,6 +754,11 @@ const app = {
       ` : ''}
       ${this.renderSubcategoryStats(s)}
     `;
+  },
+
+  toggleStatsExpand() {
+    const bar = document.getElementById('statsBar');
+    if (bar) bar.classList.toggle('expanded');
   },
 
   renderSubcategoryStats(s) {

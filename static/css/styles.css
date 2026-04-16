@@ -613,6 +613,53 @@ body.drawer-open { overflow: hidden; }
 .stat-tag.accent .stat-value { color: var(--color-accent-dark); }
 [data-theme="dark"] .stat-tag.accent .stat-value { color: var(--color-accent-light); }
 
+/* Mobile-only compact summary line (hidden on desktop) */
+.stats-summary-line {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-summary-line .stat-value {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.stats-summary-line .stat-sep {
+  opacity: 0.4;
+}
+
+.stats-expand-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, border-color 0.15s ease;
+}
+
+.stats-expand-toggle:hover {
+  border-color: var(--color-accent);
+}
+
+.stats-bar.expanded .stats-expand-toggle {
+  transform: rotate(180deg);
+}
+
 /* Stats breakdown toggle — hidden on desktop (pills shown inline), shown on mobile */
 .stats-breakdown-toggle {
   display: none;
@@ -1656,6 +1703,114 @@ body.drawer-open { overflow: hidden; }
   justify-content: center;
 }
 
+.upload-preview-focal {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 24px;
+  height: 24px;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.upload-preview-focal:hover,
+.upload-preview-focal.has-focal {
+  opacity: 1;
+  background: rgba(0,0,0,0.75);
+}
+
+/* --- Focal Point Picker Overlay --- */
+.focal-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.focal-picker-container {
+  max-width: 600px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.focal-picker-hint {
+  color: rgba(255,255,255,0.8);
+  font-size: 0.9rem;
+  text-align: center;
+  margin: 0;
+}
+
+.focal-picker-image-wrap {
+  position: relative;
+  width: 100%;
+  max-height: 70vh;
+  overflow: hidden;
+  border-radius: 8px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.focal-picker-img {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+.focal-picker-crosshair {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  margin-left: -16px;
+  margin-top: -16px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.focal-picker-crosshair::before,
+.focal-picker-crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(255,255,255,0.9);
+  box-shadow: 0 0 4px rgba(0,0,0,0.5);
+}
+
+.focal-picker-crosshair::before {
+  left: 50%;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  margin-left: -1px;
+}
+
+.focal-picker-crosshair::after {
+  top: 50%;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  margin-top: -1px;
+}
+
+.focal-picker-actions {
+  display: flex;
+  gap: 10px;
+}
+
 /* --- Empty State --- */
 .empty-state {
   text-align: center;
@@ -1804,10 +1959,16 @@ body.drawer-open { overflow: hidden; }
 
   .menu-toggle { display: block; }
 
-  /* Compact stats breakdown — categories collapse behind a single toggle */
-  .stats-inner { gap: 8px; }
+  /* Compact stats on mobile — single summary line with expand toggle */
+  .stats-bar { padding: 8px 0; }
+  .stats-inner { gap: 6px; padding: 0 16px; }
+  .stat-tag { display: none; }                   /* hide individual pills by default */
+  .stats-summary-line { display: flex; }          /* show compact summary instead */
+  .stats-expand-toggle { display: inline-flex; }  /* show expand arrow */
+  .stats-bar.expanded .stat-tag { display: inline-flex; font-size: 0.78rem; padding: 5px 10px; }
+  .stats-bar.expanded .stats-summary-line { display: none; }
   .stats-breakdown-toggle { display: inline-flex; }
-  .stats-breakdown { display: none; flex-basis: 100%; gap: 8px; flex-wrap: wrap; }
+  .stats-breakdown { display: none; flex-basis: 100%; gap: 6px; flex-wrap: wrap; }
   .stats-breakdown.open { display: flex; }
 
   .hero-title { font-size: 2rem; }
@@ -2110,7 +2271,7 @@ body.drawer-open { overflow: hidden; }
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center;
+    object-position: center 25%;  /* favour top quarter — shows the train, not the sky */
   }
 
   /* Badges overlaid on the thumbnail — smaller, hugs the corner */
