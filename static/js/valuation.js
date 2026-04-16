@@ -755,6 +755,25 @@ Object.assign(app, {
       return;
     }
 
+    // Single-month case: bulk imports produce exactly one data point, which
+    // renders as a lonely dot and looks broken. Replace with a reassuring
+    // message centred on the canvas.
+    if (data.length === 1) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = theme.text;
+      ctx.font = 'bold 22px "Georgia", "Times New Roman", serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(data[0]) + ' items', width / 2, height / 2 - 16);
+      ctx.fillStyle = theme.textMuted;
+      ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.fillText('first catalogued ' + labels[0], width / 2, height / 2 + 14);
+      ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.fillText('Timeline will fill in as you add items across months', width / 2, height / 2 + 36);
+      this._chartData[canvasId] = { hitboxes: [], type: 'area' };
+      return;
+    }
+
     const leftPad = 36;
     const rightPad = 20;
     const topPad = 20;

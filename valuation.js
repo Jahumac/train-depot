@@ -177,11 +177,25 @@ function buildSearchAttempts(item) {
 }
 
 /**
- * Keep only listings whose title plausibly matches our item.
- * Must contain the product code, the manufacturer, OR a distinctive
- * name keyword. Filters out the false matches that inflated the
- * "Best Deals" list (wrong-scale or wrong-product items).
+ * Keep only listings whose title plausibly matches our item AND
+ * looks like an actual model — not a photograph, postcard, book,
+ * decal, transfer, brochure, etc. Sellers routinely list those in
+ * the OO Gauge category and they were inflating the comparables
+ * pool with £1-£5 items that are not models at all.
  */
+const NON_MODEL_KEYWORDS = [
+  // Paper / media collectables
+  'photo', 'photograph', 'postcard', 'post card', 'poster', 'print',
+  'slide', 'negative', 'book', 'booklet', 'magazine', 'brochure',
+  'catalogue', 'catalog', 'leaflet', 'manual', 'instruction',
+  // Decals / transfers / stickers
+  'decal', 'sticker', 'transfer', 'name plate only', 'nameplate only',
+  // Empty packaging
+  'empty box', 'box only', 'empty case',
+  // Unrelated
+  'dvd', 'video', 'cd-rom', 'cdrom'
+];
+
 function filterRelevantListings(listings, item) {
   const code = (item.productCode || '').toLowerCase().trim();
   const mfg = (item.manufacturer || '').toLowerCase().trim();
@@ -192,6 +206,11 @@ function filterRelevantListings(listings, item) {
 
   return listings.filter(l => {
     const title = (l.title || '').toLowerCase();
+
+    // Hard-reject non-model listings (photos, postcards, books, decals, …)
+    if (NON_MODEL_KEYWORDS.some(k => title.includes(k))) return false;
+
+    // Must plausibly match our item by code, manufacturer, or name keyword
     if (code && title.includes(code)) return true;
     if (mfg && title.includes(mfg)) return true;
     if (nameWords.some(w => title.includes(w))) return true;
