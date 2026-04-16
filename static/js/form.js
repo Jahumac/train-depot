@@ -22,7 +22,8 @@ Object.assign(app, {
     // Set smart defaults
     document.getElementById('formCondition').value = 'excellent-boxed';
     document.getElementById('formDccStatus').value = 'analogue';
-    // Initialize empty tags
+    // Fetch known tags for autocomplete, then render empty tags
+    await this.loadKnownTags();
     this.renderFormTags([]);
     // Reset wishlist fields
     const wfg = document.getElementById('wishlistFieldsGroup');
@@ -72,7 +73,8 @@ Object.assign(app, {
     if (wspEl) wspEl.value = item.wishlistSpottedPrice || '';
     this.toggleWishlistFields();
 
-    // Render tags
+    // Fetch known tags for autocomplete, then render item's tags
+    await this.loadKnownTags();
     this.renderFormTags(item.tags || []);
 
     this.renderUploadPreviews();
@@ -308,6 +310,16 @@ Object.assign(app, {
 
   // ==================== Tags Management ====================
 
+  // --- All known tags (fetched once per form open, shared across helpers) ---
+  _allKnownTags: [],
+
+  async loadKnownTags() {
+    try {
+      const tags = await this.api('/api/tags');
+      this._allKnownTags = tags.map(t => t.name).sort((a, b) => a.localeCompare(b));
+    } catch { this._allKnownTags = []; }
+  },
+
   renderFormTags(tags) {
     const container = document.getElementById('formTagsContainer');
     if (!container) return;
@@ -317,6 +329,30 @@ Object.assign(app, {
         <span class="tag-chip-remove" onclick="app.removeFormTag('${this.esc(tag)}')">×</span>
       </span>
     `).join('');
+    this.renderTagSuggestionChips(tags);
+  },
+
+  /** Show clickable chips for existing tags not yet added */
+  renderTagSuggestionChips(currentTags) {
+    const container = document.getElementById('tagSuggestionsChips');
+    if (!container) return;
+    const remaining = this._allKnownTags.filter(t => !currentTags.includes(t));
+    if (remaining.length === 0) { container.innerHTML = ''; return; }
+    container.innerHTML = remaining.map(tag => `
+      <span class="tag-suggestion-chip" onclick="app.addTagByName('${this.esc(tag)}')">#${this.esc(tag)}</span>
+    `).join('');
+  },
+
+  /** Populate the <datalist> with tags not yet applied */
+  filterTagSuggestions() {
+    const dl = document.getElementById('tagSuggestions');
+    if (!dl) return;
+    const currentTags = this.getFormTags();
+    const input = (document.getElementById('formTags')?.value || '').toLowerCase();
+    const matches = this._allKnownTags
+      .filter(t => !currentTags.includes(t))
+      .filter(t => !input || t.toLowerCase().includes(input));
+    dl.innerHTML = matches.map(t => `<option value="${this.esc(t)}">`).join('');
   },
 
   getFormTags() {
@@ -338,19 +374,37 @@ Object.assign(app, {
     }
   },
 
+  /** Add tag from the text input (called by Add button or Enter key) */
+  addTagFromInput() {
+    const input = document.getElementById('formTags');
+    if (!input) return;
+    const tag = input.value.trim();
+    if (!tag) return;
+    const tags = this.getFormTags();
+    if (!tags.includes(tag)) {
+      tags.push(tag);
+      this.renderFormTags(tags);
+    }
+    input.value = '';
+    this.filterTagSuggestions();
+    input.focus();
+  },
+
+  /** Add a known tag by clicking its suggestion chip */
+  addTagByName(tag) {
+    const tags = this.getFormTags();
+    if (!tags.includes(tag)) {
+      tags.push(tag);
+      this.renderFormTags(tags);
+    }
+    const input = document.getElementById('formTags');
+    if (input) { input.value = ''; input.focus(); }
+  },
+
   handleTagInput(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
-      const input = document.getElementById('formTags');
-      const tag = input.value.trim();
-      if (!tag) return;
-
-      const tags = this.getFormTags();
-      if (!tags.includes(tag)) {
-        tags.push(tag);
-        this.renderFormTags(tags);
-      }
-      input.value = '';
+      this.addTagFromInput();
     }
   },
 

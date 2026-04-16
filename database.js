@@ -299,15 +299,16 @@ function findDuplicatesByProductCode(productCode) {
 function searchItems(query) {
   const db = readDb();
   const q = query.toLowerCase();
+  const s = (v) => (v || '').toLowerCase();
   return db.items.filter(item => !item.deleted).filter(item =>
-    item.name.toLowerCase().includes(q) ||
-    item.manufacturer.toLowerCase().includes(q) ||
-    item.livery.toLowerCase().includes(q) ||
-    item.historicalBackground.toLowerCase().includes(q) ||
-    item.goesWellWith.toLowerCase().includes(q) ||
-    item.runningNumber.toLowerCase().includes(q) ||
-    item.productCode.toLowerCase().includes(q) ||
-    (item.tags && item.tags.some(tag => tag.toLowerCase().includes(q)))
+    s(item.name).includes(q) ||
+    s(item.manufacturer).includes(q) ||
+    s(item.livery).includes(q) ||
+    s(item.historicalBackground).includes(q) ||
+    s(item.goesWellWith).includes(q) ||
+    s(item.runningNumber).includes(q) ||
+    s(item.productCode).includes(q) ||
+    (Array.isArray(item.tags) && item.tags.some(tag => s(tag).includes(q)))
   );
 }
 

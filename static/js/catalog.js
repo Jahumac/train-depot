@@ -197,7 +197,12 @@ Object.assign(app, {
         </ul>
 
         <div class="catalog-tags-section">
-          <div class="catalog-tags-title">🏷️ Filter by Tag</div>
+          <div class="catalog-tags-title" onclick="app.toggleSidebarTags()">
+            🏷️ Tags
+            <span class="catalog-tags-count">${allTags.length}</span>
+            <span class="catalog-tags-chevron ${this._sidebarTagsOpen || this.currentFilter?.type === 'tag' ? 'open' : ''}">▸</span>
+          </div>
+          <div class="catalog-tags-body ${this._sidebarTagsOpen || this.currentFilter?.type === 'tag' ? 'open' : ''}">
           ${allTags.length > 0 ? `
             <ul class="catalog-tags-list">
               ${allTags.map(tag => `
@@ -217,6 +222,7 @@ Object.assign(app, {
             </p>
             <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;" onclick="app.openAddModal()">➕ Add an item with tags</button>
           `}
+          </div>
         </div>
 
         <div class="sidebar-actions">
@@ -391,6 +397,17 @@ Object.assign(app, {
         </div>
       </div>
     `;
+  },
+
+  _sidebarTagsOpen: false,
+
+  toggleSidebarTags() {
+    this._sidebarTagsOpen = !this._sidebarTagsOpen;
+    // Animate without full re-render
+    const body = document.querySelector('.catalog-tags-body');
+    const chevron = document.querySelector('.catalog-tags-chevron');
+    if (body) body.classList.toggle('open', this._sidebarTagsOpen);
+    if (chevron) chevron.classList.toggle('open', this._sidebarTagsOpen);
   },
 
   getAllTagsForSidebar() {

@@ -3,7 +3,7 @@
  * Caches static assets for offline-capable PWA experience
  */
 
-const CACHE_NAME = 'train-depot-v1.5';
+const CACHE_NAME = 'train-depot-v1.6';
 // Only precache assets that are versioned via ?v=N query-strings or rarely change.
 // index.html is intentionally omitted — it uses network-first so HTML updates
 // (new buttons, cache-bust bumps) propagate on the next load.
