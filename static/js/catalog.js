@@ -139,6 +139,13 @@ Object.assign(app, {
               </div>
             </div>
             ${this.getFilteredItems().length === 0 ? this.renderEmpty() : `
+              ${this.totalPages > 1 ? `
+                <div class="pagination-bar">
+                  <button class="btn btn-outline btn-sm" onclick="app.goToPage(${this.currentPage - 1})" ${this.currentPage <= 1 ? 'disabled' : ''}>← Prev</button>
+                  <span class="pagination-info">Page ${this.currentPage} of ${this.totalPages}</span>
+                  <button class="btn btn-outline btn-sm" onclick="app.goToPage(${this.currentPage + 1})" ${this.currentPage >= this.totalPages ? 'disabled' : ''}>Next →</button>
+                </div>
+              ` : ''}
               <div class="items-grid">
                 ${this.getFilteredItems().map(item => this.renderItemCard(item)).join('')}
               </div>
