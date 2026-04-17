@@ -220,13 +220,13 @@ Object.assign(app, {
               `).join('')}
             </ul>
             ${this.currentFilter?.type === 'tag' ? `
-              <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;" onclick="app.showCatalog()">✕ Clear tag filter</button>
+              <button class="btn btn-outline btn-sm catalog-tags-action-btn" onclick="app.showCatalog()">✕ Clear tag filter</button>
             ` : ''}
           ` : `
             <p class="catalog-tags-empty">
               No tags yet. Open any item's edit screen, type a tag in the <strong>Tags</strong> field and press Enter. Good examples: "layout-ready", "needs-service", "display".
             </p>
-            <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;" onclick="app.openAddModal()">➕ Add an item with tags</button>
+            <button class="btn btn-outline btn-sm catalog-tags-action-btn" onclick="app.openAddModal()">➕ Add an item with tags</button>
           `}
           </div>
         </div>
