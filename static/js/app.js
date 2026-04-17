@@ -612,6 +612,8 @@ const app = {
     this._pushingState = true;
     if (!state || state.view === 'landing') {
       this.showLanding();
+    } else if (state.view === 'layout') {
+      this.showLayout();
     } else if (state.view === 'catalog') {
       this.showCatalog(state.filter || null, state.page || 1);
     } else if (state.view === 'detail' && state.id) {
@@ -630,6 +632,21 @@ const app = {
     document.getElementById('statsBar').style.display = 'none';
     this.render();
     this.pushHistory('landing', {});
+  },
+
+  async showLayout() {
+    this.currentView = 'layout';
+    this.setNav('layout');
+    document.getElementById('statsBar').style.display = 'none';
+    try {
+      this._layoutData = await this.api('/api/layout');
+    } catch(e) {
+      this._layoutData = { description: '', heroImage: null, zones: [] };
+    }
+    this._layoutEditMode = false;
+    this.render();
+    this.pushHistory('layout', {});
+    window.scrollTo({ top: 0, behavior: 'instant' });
   },
 
   async showCatalog(filter = null, page = 1) {
@@ -710,6 +727,7 @@ const app = {
       case 'catalog': main.innerHTML = this.renderCatalog(); break;
       case 'detail':  main.innerHTML = this.renderDetail();  break;
       case 'dashboard': this.showDashboard(); break;
+      case 'layout':  main.innerHTML = this.renderLayout(); break;
       case 'backup':  main.innerHTML = this.renderBackupView(); break;
       case 'trash':   main.innerHTML = this.renderTrashView(); break;
       case 'timeline': main.innerHTML = this.renderTimelineView(); break;
@@ -720,7 +738,7 @@ const app = {
 
   updateNav() {
     // Update nav active state based on currentView
-    const viewNavMap = { landing: 'home', catalog: 'catalog', dashboard: 'dashboard', backup: 'backup' };
+    const viewNavMap = { landing: 'home', catalog: 'catalog', layout: 'layout', dashboard: 'dashboard', backup: 'backup' };
     const navId = viewNavMap[this.currentView];
     if (navId) this.setNav(navId);
   },

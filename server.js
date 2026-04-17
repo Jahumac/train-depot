@@ -1464,6 +1464,96 @@ async function handleApiRequest(req, res, pathname) {
     });
   }
 
+  // ==================== Layout API ====================
+
+  // GET /api/layout
+  if (pathname === '/api/layout' && req.method === 'GET') {
+    return sendJson(res, 200, db.getLayout());
+  }
+
+  // PUT /api/layout — update description / heroImage
+  if (pathname === '/api/layout' && req.method === 'PUT') {
+    const body = await readBody(req);
+    const data = parseJsonBody(body);
+    if (!data) return sendError(res, 400, 'Invalid JSON');
+    return sendJson(res, 200, db.updateLayout(data));
+  }
+
+  // POST /api/layout/hero — upload hero image
+  if (pathname === '/api/layout/hero' && req.method === 'POST') {
+    const contentType = req.headers['content-type'] || '';
+    const boundaryMatch = contentType.match(/boundary=(.+)/);
+    if (!boundaryMatch) return sendError(res, 400, 'Missing boundary');
+    const body = await readBody(req);
+    const parts = parseMultipart(body, boundaryMatch[1]);
+    const filePart = parts.find(p => p.filename && p.data.length > 0);
+    if (!filePart) return sendError(res, 400, 'No file');
+    if (filePart.data.length > MAX_FILE_SIZE) return sendError(res, 400, 'File too large');
+    const ext = path.extname(filePart.filename).toLowerCase() || '.jpg';
+    if (!['.jpg','.jpeg','.png','.webp'].includes(ext)) return sendError(res, 400, 'Invalid type');
+    const filename = `${crypto.randomUUID()}${ext}`;
+    fs.writeFileSync(path.join(UPLOAD_DIR, filename), filePart.data);
+    const url = `/uploads/${filename}`;
+    db.updateLayout({ heroImage: url });
+    return sendJson(res, 200, { url });
+  }
+
+  // POST /api/layout/zones
+  if (pathname === '/api/layout/zones' && req.method === 'POST') {
+    const body = await readBody(req);
+    const data = parseJsonBody(body);
+    if (!data || !data.name) return sendError(res, 400, 'name required');
+    return sendJson(res, 201, db.addLayoutZone(data));
+  }
+
+  // PUT /api/layout/zones/:id
+  const layoutZoneMatch = pathname.match(/^\/api\/layout\/zones\/([^/]+)$/);
+  if (layoutZoneMatch && req.method === 'PUT') {
+    const body = await readBody(req);
+    const data = parseJsonBody(body);
+    const zone = db.updateLayoutZone(layoutZoneMatch[1], data || {});
+    if (!zone) return sendError(res, 404, 'Zone not found');
+    return sendJson(res, 200, zone);
+  }
+
+  // DELETE /api/layout/zones/:id
+  if (layoutZoneMatch && req.method === 'DELETE') {
+    if (!db.deleteLayoutZone(layoutZoneMatch[1])) return sendError(res, 404, 'Zone not found');
+    return sendJson(res, 200, { ok: true });
+  }
+
+  // POST /api/layout/zones/:id/photos — upload photos
+  const layoutZonePhotosMatch = pathname.match(/^\/api\/layout\/zones\/([^/]+)\/photos$/);
+  if (layoutZonePhotosMatch && req.method === 'POST') {
+    const contentType = req.headers['content-type'] || '';
+    const boundaryMatch = contentType.match(/boundary=(.+)/);
+    if (!boundaryMatch) return sendError(res, 400, 'Missing boundary');
+    const body = await readBody(req);
+    const parts = parseMultipart(body, boundaryMatch[1]);
+    const saved = [];
+    for (const part of parts) {
+      if (!part.filename || !part.data.length) continue;
+      if (part.data.length > MAX_FILE_SIZE) continue;
+      const ext = path.extname(part.filename).toLowerCase() || '.jpg';
+      if (!['.jpg','.jpeg','.png','.gif','.webp'].includes(ext)) continue;
+      const filename = `${crypto.randomUUID()}${ext}`;
+      fs.writeFileSync(path.join(UPLOAD_DIR, filename), part.data);
+      const url = `/uploads/${filename}`;
+      db.addLayoutZonePhoto(layoutZonePhotosMatch[1], url);
+      saved.push(url);
+    }
+    return sendJson(res, 200, { files: saved });
+  }
+
+  // DELETE /api/layout/zones/:id/photos
+  if (layoutZonePhotosMatch && req.method === 'DELETE') {
+    const body = await readBody(req);
+    const data = parseJsonBody(body);
+    if (!data || !data.url) return sendError(res, 400, 'url required');
+    db.removeLayoutZonePhoto(layoutZonePhotosMatch[1], data.url);
+    return sendJson(res, 200, { ok: true });
+  }
+
   return sendError(res, 404, 'API endpoint not found');
 }
 

@@ -640,6 +640,79 @@ function importData(jsonString) {
   return true;
 }
 
+// ==================== Layout ====================
+
+function getLayout() {
+  const db = readDb();
+  if (!db.layout) db.layout = { description: '', heroImage: null, zones: [] };
+  return db.layout;
+}
+
+function updateLayout(updates) {
+  const db = readDb();
+  if (!db.layout) db.layout = { description: '', heroImage: null, zones: [] };
+  if (updates.description !== undefined) db.layout.description = String(updates.description);
+  if (updates.heroImage !== undefined) db.layout.heroImage = updates.heroImage || null;
+  writeDb(db);
+  return db.layout;
+}
+
+function addLayoutZone(zoneData) {
+  const db = readDb();
+  if (!db.layout) db.layout = { description: '', heroImage: null, zones: [] };
+  const zone = {
+    id: generateId(),
+    name: String(zoneData.name || 'New Zone').trim(),
+    description: String(zoneData.description || '').trim(),
+    images: [],
+    order: db.layout.zones.length
+  };
+  db.layout.zones.push(zone);
+  writeDb(db);
+  return zone;
+}
+
+function updateLayoutZone(id, updates) {
+  const db = readDb();
+  if (!db.layout) return null;
+  const zone = db.layout.zones.find(z => z.id === id);
+  if (!zone) return null;
+  if (updates.name !== undefined) zone.name = String(updates.name).trim();
+  if (updates.description !== undefined) zone.description = String(updates.description).trim();
+  writeDb(db);
+  return zone;
+}
+
+function deleteLayoutZone(id) {
+  const db = readDb();
+  if (!db.layout) return false;
+  const idx = db.layout.zones.findIndex(z => z.id === id);
+  if (idx === -1) return false;
+  db.layout.zones.splice(idx, 1);
+  writeDb(db);
+  return true;
+}
+
+function addLayoutZonePhoto(zoneId, url) {
+  const db = readDb();
+  if (!db.layout) return null;
+  const zone = db.layout.zones.find(z => z.id === zoneId);
+  if (!zone) return null;
+  if (!zone.images.includes(url)) zone.images.push(url);
+  writeDb(db);
+  return zone;
+}
+
+function removeLayoutZonePhoto(zoneId, url) {
+  const db = readDb();
+  if (!db.layout) return false;
+  const zone = db.layout.zones.find(z => z.id === zoneId);
+  if (!zone) return false;
+  zone.images = zone.images.filter(img => img !== url);
+  writeDb(db);
+  return true;
+}
+
 module.exports = {
   ensureDbExists,
   invalidateCache,
@@ -678,6 +751,13 @@ module.exports = {
   removePassword,
   getStats,
   exportData,
+  getLayout,
+  updateLayout,
+  addLayoutZone,
+  updateLayoutZone,
+  deleteLayoutZone,
+  addLayoutZonePhoto,
+  removeLayoutZonePhoto,
   importData,
   DEFAULT_CATEGORIES,
   DEFAULT_SETTINGS

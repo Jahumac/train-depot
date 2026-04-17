@@ -30,6 +30,7 @@
       <ul class="nav-links" id="navLinks">
         <li><a href="#" onclick="app.showLanding(); return false;" id="nav-home" class="active">Home</a></li>
         <li><a href="#" onclick="app.showCatalog(); return false;" id="nav-catalog">Catalog</a></li>
+        <li><a href="#" onclick="app.showLayout(); return false;" id="nav-layout">Layout</a></li>
         <li><a href="#" onclick="app.showDashboard(); return false;" id="nav-dashboard">Dashboard</a></li>
         <li><a href="#" onclick="app.showBackup(); return false;" id="nav-backup">Settings</a></li>
       </ul>
@@ -61,6 +62,7 @@
     <nav class="mobile-drawer-nav">
       <a href="#" onclick="app.showLanding(); app.closeMobileMenu(); return false;">🏠 Home</a>
       <a href="#" onclick="app.showCatalog(); app.closeMobileMenu(); return false;">📚 Catalog</a>
+      <a href="#" onclick="app.showLayout(); app.closeMobileMenu(); return false;">🏗️ Layout</a>
       <a href="#" onclick="app.showDashboard(); app.closeMobileMenu(); return false;">📊 Dashboard</a>
       <a href="#" onclick="app.showBackup(); app.closeMobileMenu(); return false;">⚙️ Settings</a>
     </nav>
@@ -301,6 +303,7 @@
   <script src="/js/form.js?v=4"></script>
   <script src="/js/valuation.js?v=3"></script>
   <script src="/js/settings.js?v=3"></script>
+  <script src="/js/layout.js?v=1"></script>
   <script>
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
