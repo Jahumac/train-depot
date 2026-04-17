@@ -604,8 +604,9 @@ Object.assign(app, {
     }
     if (this.showWishlistOnly) params = (params ? params + '&' : '?') + 'wishlist=true';
     await this.loadItems(params);
+    this.pushHistory('catalog', { filter: this.currentFilter, page: this.currentPage });
     this.render();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   },
 
   // --- Random Spotlight ---

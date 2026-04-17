@@ -613,7 +613,7 @@ const app = {
     if (!state || state.view === 'landing') {
       this.showLanding();
     } else if (state.view === 'catalog') {
-      this.showCatalog(state.filter || null);
+      this.showCatalog(state.filter || null, state.page || 1);
     } else if (state.view === 'detail' && state.id) {
       this.showDetail(state.id);
     } else if (state.view === 'backup') {
@@ -632,11 +632,11 @@ const app = {
     this.pushHistory('landing', {});
   },
 
-  async showCatalog(filter = null) {
+  async showCatalog(filter = null, page = 1) {
     this.currentView = 'catalog';
     this.currentFilter = filter;
     this.showWishlistOnly = false;
-    this.currentPage = 1;
+    this.currentPage = page;
     this.setNav('catalog');
 
     let params = '';
@@ -652,7 +652,7 @@ const app = {
     await this.loadStats();
     document.getElementById('statsBar').style.display = '';
     this.render();
-    this.pushHistory('catalog', { filter });
+    this.pushHistory('catalog', { filter, page: this.currentPage });
 
     // Auto-close the mobile sidebar drawer when a filter is picked
     document.body.classList.remove('drawer-open');
