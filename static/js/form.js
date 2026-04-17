@@ -18,6 +18,7 @@ Object.assign(app, {
     this.existingImages = [];
     this._focalPoints = {};
     this._crops = {};
+    this.dismissWikiPreview();
     document.getElementById('modalTitle').textContent = 'Add New Item';
     this.populateCategorySelects();
     this.clearForm();
@@ -45,6 +46,7 @@ Object.assign(app, {
     this.existingImages = [...(item.images || [])];
     this._focalPoints = item.imageFocalPoints ? { ...item.imageFocalPoints } : {};
     this._crops = item.imageCrops ? { ...item.imageCrops } : {};
+    this.dismissWikiPreview();
 
     document.getElementById('modalTitle').textContent = 'Edit Item';
     this.populateCategorySelects(item.categoryId);
