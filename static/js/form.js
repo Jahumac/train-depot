@@ -647,9 +647,21 @@ Object.assign(app, {
 
   _renderWikiPreview(preview, data) {
     const otherTitles = data.otherTitles || [];
+    const sections = data.historySections || [];
+
     const otherBtns = otherTitles.map((t, i) =>
       `<button type="button" class="btn btn-outline btn-sm wiki-other-btn" data-idx="${i}">${this.esc(t)}</button>`
     ).join('');
+
+    const sectionsHtml = sections.map((s, i) => `
+      <div class="wiki-section">
+        <div class="wiki-section-header">
+          <span class="wiki-section-name">${this.esc(s.name)}</span>
+          <button type="button" class="btn btn-outline btn-sm wiki-section-use" data-idx="${i}">Use this</button>
+        </div>
+        <p class="wiki-preview-extract">${this.esc(s.body)}</p>
+      </div>
+    `).join('');
 
     preview.style.display = 'block';
     preview.innerHTML = `
@@ -658,16 +670,29 @@ Object.assign(app, {
           <strong>${this.esc(data.title)}</strong>
           <a href="${this.esc(data.url)}" target="_blank" rel="noopener" class="wiki-preview-link">↗ Wikipedia</a>
         </div>
-        <p class="wiki-preview-extract">${this.esc(data.extract)}</p>
+
+        <div class="wiki-section">
+          <div class="wiki-section-header">
+            <span class="wiki-section-name">Introduction</span>
+            <button type="button" class="btn btn-outline btn-sm" id="wikiAcceptIntroBtn">Use this</button>
+          </div>
+          <p class="wiki-preview-extract">${this.esc(data.extract)}</p>
+        </div>
+
+        ${sectionsHtml}
+
         <div class="wiki-preview-actions">
-          <button type="button" class="btn btn-primary btn-sm" id="wikiAcceptBtn">Use this</button>
           <button type="button" class="btn btn-outline btn-sm" id="wikiDismissBtn">Dismiss</button>
         </div>
         ${otherBtns ? `<div class="wiki-preview-others"><span>Try instead:</span>${otherBtns}</div>` : ''}
       </div>
     `;
-    preview.querySelector('#wikiAcceptBtn').addEventListener('click', () => this.acceptWikiText(data.extract));
+
+    preview.querySelector('#wikiAcceptIntroBtn').addEventListener('click', () => this.acceptWikiText(data.extract));
     preview.querySelector('#wikiDismissBtn').addEventListener('click', () => this.dismissWikiPreview());
+    preview.querySelectorAll('.wiki-section-use').forEach(btn => {
+      btn.addEventListener('click', () => this.acceptWikiText(sections[btn.dataset.idx].body));
+    });
     preview.querySelectorAll('.wiki-other-btn').forEach(btn => {
       btn.addEventListener('click', () => this.fetchWikipediaDirect(otherTitles[btn.dataset.idx]));
     });

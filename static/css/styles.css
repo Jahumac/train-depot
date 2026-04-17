@@ -3498,7 +3498,28 @@ body.drawer-open { overflow: hidden; }
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.wiki-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.wiki-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.wiki-section-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .wiki-preview-link {

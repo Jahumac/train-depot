@@ -1006,8 +1006,7 @@ async function handleApiRequest(req, res, pathname) {
     if (!q) return sendError(res, 400, 'Missing query');
 
     const https = require('https');
-    const wikiSearch = (query) => new Promise((resolve, reject) => {
-      const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=5&sroffset=${offset}`;
+    const wikiGet = (url) => new Promise((resolve, reject) => {
       https.get(url, { headers: { 'User-Agent': 'TrainDepot/1.0 (model train catalog)' } }, (r) => {
         let data = '';
         r.on('data', c => data += c);
@@ -1015,28 +1014,50 @@ async function handleApiRequest(req, res, pathname) {
       }).on('error', reject);
     });
 
-    const wikiSummary = (title) => new Promise((resolve, reject) => {
-      const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
-      https.get(url, { headers: { 'User-Agent': 'TrainDepot/1.0 (model train catalog)' } }, (r) => {
-        let data = '';
-        r.on('data', c => data += c);
-        r.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
-      }).on('error', reject);
-    });
+    const HISTORY_KEYWORDS = ['history', 'background', 'development', 'origin', 'service history', 'design history', 'construction'];
+
+    function parseHistorySections(fullText) {
+      if (!fullText) return [];
+      // Split on top-level == Section == headers only
+      const parts = fullText.split(/\n==\s*([^=\n]+?)\s*==\s*\n/);
+      const found = [];
+      for (let i = 1; i < parts.length; i += 2) {
+        const name = parts[i].trim();
+        const body = (parts[i + 1] || '').replace(/\n===.*?===\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+        if (body && HISTORY_KEYWORDS.some(k => name.toLowerCase().includes(k))) {
+          found.push({ name, body });
+        }
+      }
+      return found;
+    }
 
     try {
-      const search = await wikiSearch(q);
+      const search = await wikiGet(
+        `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&srlimit=5&sroffset=${offset}`
+      );
       const results = search?.query?.search || [];
       if (results.length === 0) return sendJson(res, 200, { found: false, total: 0 });
 
-      const summary = await wikiSummary(results[0].title);
+      const title = results[0].title;
+
+      // Fetch intro summary and full plain-text article in parallel
+      const [summary, fullPage] = await Promise.all([
+        wikiGet(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`),
+        wikiGet(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts&explaintext=1&exsectionformat=plain&format=json`)
+      ]);
+
+      const pages = fullPage?.query?.pages || {};
+      const pageData = Object.values(pages)[0];
+      const historySections = parseHistorySections(pageData?.extract || '');
+
       return sendJson(res, 200, {
         found: true,
         total: results.length + offset,
         offset,
         title: summary.title,
         extract: summary.extract,
-        url: summary.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(results[0].title)}`,
+        historySections,
+        url: summary.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`,
         otherTitles: results.slice(1).map(r => r.title)
       });
     } catch (e) {
