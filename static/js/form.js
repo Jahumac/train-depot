@@ -281,14 +281,21 @@ Object.assign(app, {
         this.toast('Welcome to the shed \u2014 new item added!');
       }
 
+      // Capture these before closeModal() nulls them
+      const savedId = this.editingItem?.id;
+      const wasInDetail = this.currentView === 'detail' && !!savedId;
+      const savedPage = this.currentPage;
+
       this.closeModal();
       await this.loadAllItems(); // refresh for suggest
       await this.loadStats();
 
-      if (this.currentView === 'detail' && this.editingItem) {
-        this.showDetail(this.editingItem.id);
+      if (wasInDetail) {
+        this.lastViewedItemId = savedId;
+        this.showDetail(savedId);
       } else {
-        this.showCatalog(this.currentFilter);
+        this.lastViewedItemId = savedId;
+        this.showCatalog(this.currentFilter, savedPage);
       }
     } catch (e) { /* toast already shown */ }
   },

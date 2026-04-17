@@ -268,8 +268,9 @@ Object.assign(app, {
     const matchHint = this.currentFilter && this.currentFilter.type === 'search'
       ? this.describeSearchMatch(item, this.currentFilter.value)
       : '';
+    const isLastViewed = this.lastViewedItemId === item.id;
     return `
-      <div class="item-card" onclick="app.showDetail('${item.id}')">
+      <div class="item-card${isLastViewed ? ' item-card--last-viewed' : ''}" onclick="app.showDetail('${item.id}')">
         <div class="item-card-image">
           ${img}
           ${subcatName ? `<span class="item-card-badge">${this.esc(subcatName)}</span>` : ''}

@@ -633,6 +633,10 @@ const app = {
   },
 
   async showCatalog(filter = null, page = 1) {
+    // Clear the last-viewed highlight when applying a new filter or going to page 1 fresh
+    if (page === 1 && JSON.stringify(filter) !== JSON.stringify(this.currentFilter)) {
+      this.lastViewedItemId = null;
+    }
     this.currentView = 'catalog';
     this.currentFilter = filter;
     this.showWishlistOnly = false;
@@ -674,6 +678,7 @@ const app = {
       this.catalogScrollY = window.scrollY;
       this.catalogPage = this.currentPage;
     }
+    this.lastViewedItemId = id;
     this.currentView = 'detail';
     try {
       this.detailItem = await this.api(`/api/items/${id}`);

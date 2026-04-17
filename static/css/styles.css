@@ -864,6 +864,16 @@ body.drawer-open { overflow: hidden; }
   border-color: var(--color-accent);
 }
 
+.item-card--last-viewed {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary), var(--shadow-sm);
+}
+
+.item-card--last-viewed:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary), var(--shadow-lg);
+}
+
 .item-card-image {
   width: 100%;
   height: 200px;
