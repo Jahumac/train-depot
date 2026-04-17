@@ -9,6 +9,17 @@ const http = require('http');
 
 // ==================== eBay API Configuration ====================
 
+// Maps gauge code → eBay category ID
+const EBAY_GAUGE_CATEGORIES = {
+  'OO':  '180293',
+  'N':   '183448',
+  'HO':  '180299',
+  'O':   '180292',
+  'TT':  '183452',
+  'Z':   '11751',
+  'G':   '180304',
+};
+
 const EBAY_AUTH_URL = 'https://api.ebay.com/identity/v1/oauth2/token';
 const EBAY_SANDBOX_AUTH_URL = 'https://api.sandbox.ebay.com/identity/v1/oauth2/token';
 const EBAY_BROWSE_URL = 'https://api.ebay.com/buy/browse/v1/item_summary/search';
@@ -120,9 +131,10 @@ async function searchEbay(item, config) {
   let bestData = null;
   let bestQuery = '';
   for (const attempt of attempts) {
+    const gaugeCategory = EBAY_GAUGE_CATEGORIES[config.gauge] || EBAY_GAUGE_CATEGORIES['OO'];
     const params = new URLSearchParams({
       q: attempt.q,
-      category_ids: '180293',  // OO Gauge — always enforced
+      category_ids: gaugeCategory,  // Gauge-specific eBay category
       filter: 'conditionIds:{1000|1500|2000|2500|3000|4000|5000|6000|7000},' +
               'buyingOptions:{FIXED_PRICE|AUCTION},' +
               'priceCurrency:GBP',

@@ -31,7 +31,7 @@ Object.assign(app, {
     const quickFacts = [
       item.manufacturer ? this.esc(item.manufacturer) : null,
       item.livery ? this.esc(item.livery) : null,
-      subcatName ? subcatName : null,
+      subcatName ? this.esc(subcatName) : null,
       item.runningNumber ? `No. ${this.esc(item.runningNumber)}` : null,
     ].filter(Boolean);
 
@@ -66,7 +66,7 @@ Object.assign(app, {
             </div>
             <div class="detail-info">
               <h1 class="detail-name">${this.esc(item.name)}</h1>
-              ${subcatName ? `<span class="detail-category-badge">${catName} &mdash; ${subcatName}</span>` : ''}
+              ${subcatName ? `<span class="detail-category-badge">${this.esc(catName)} &mdash; ${this.esc(subcatName)}</span>` : ''}
 
               ${quickFacts.length > 0 ? `
                 <div class="detail-quick-facts">

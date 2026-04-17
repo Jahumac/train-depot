@@ -833,6 +833,20 @@ body.drawer-open { overflow: hidden; }
   gap: 24px;
 }
 
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 32px;
+  padding: 16px 0;
+}
+
+.pagination-info {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
 /* --- Item Card --- */
 .item-card {
   background: var(--color-bg-card);

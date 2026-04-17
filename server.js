@@ -509,7 +509,7 @@ async function handleAuthRequest(req, res, pathname) {
 
     // If no password set yet, this is the setup call
     if (!db.hasPassword()) {
-      if (data.password.length < 4) return sendError(res, 400, 'Password must be at least 4 characters');
+      if (data.password.length < 8) return sendError(res, 400, 'Password must be at least 8 characters');
       db.setPassword(data.password);
       createSession(res);
       clearRateLimit(req);
@@ -558,8 +558,8 @@ async function handleAuthRequest(req, res, pathname) {
       }
     }
 
-    if (!data.newPassword || data.newPassword.length < 4) {
-      return sendError(res, 400, 'New password must be at least 4 characters');
+    if (!data.newPassword || data.newPassword.length < 8) {
+      return sendError(res, 400, 'New password must be at least 8 characters');
     }
 
     db.setPassword(data.newPassword);
@@ -609,7 +609,10 @@ async function handleApiRequest(req, res, pathname) {
     const search = reqUrl.searchParams.get('search');
     const category = reqUrl.searchParams.get('category');
     const subcategory = reqUrl.searchParams.get('subcategory');
+    const tag = reqUrl.searchParams.get('tag');
     const wishlist = reqUrl.searchParams.get('wishlist');
+    const page = parseInt(reqUrl.searchParams.get('page')) || null;
+    const limit = Math.min(parseInt(reqUrl.searchParams.get('limit')) || 48, 200);
 
     let items;
     if (search) {
@@ -618,6 +621,8 @@ async function handleApiRequest(req, res, pathname) {
       items = db.getItemsBySubcategory(subcategory);
     } else if (category) {
       items = db.getItemsByCategory(category);
+    } else if (tag) {
+      items = db.getItemsByTag(decodeURIComponent(tag));
     } else {
       items = db.getAllItems();
     }
@@ -625,6 +630,21 @@ async function handleApiRequest(req, res, pathname) {
     // Filter wishlist items if requested
     if (wishlist === 'true') {
       items = items.filter(item => item.wishlist);
+    }
+
+    // Pagination — only when page param is explicitly provided
+    if (page) {
+      const total = items.length;
+      const pages = Math.max(1, Math.ceil(total / limit));
+      const safePage = Math.min(page, pages);
+      const start = (safePage - 1) * limit;
+      return sendJson(res, 200, {
+        items: items.slice(start, start + limit),
+        total,
+        page: safePage,
+        limit,
+        pages
+      });
     }
 
     return sendJson(res, 200, items);
@@ -766,6 +786,8 @@ async function handleApiRequest(req, res, pathname) {
         const row = rows[i];
         try {
           // Map CSV columns to item fields (flexible column naming)
+          const originalCategory = row.category_id || row.category || '';
+          const originalSubcategory = row.subcategory_id || row.subcategory || '';
           const itemData = {
             name: row.name || row.model || row.item || '',
             manufacturer: row.manufacturer || row.make || '',
@@ -776,8 +798,8 @@ async function handleApiRequest(req, res, pathname) {
             lastServiceDate: row.last_service_date || row.service_date || row.last_service || '',
             goesWellWith: row.goes_well_with || row.compatible || '',
             historicalBackground: row.historical_background || row.history || row.description || '',
-            categoryId: row.category_id || row.category || '',
-            subcategoryId: row.subcategory_id || row.subcategory || '',
+            categoryId: originalCategory,
+            subcategoryId: originalSubcategory,
             wishlist: row.wishlist === 'true' || row.wishlist === '1' || row.wishlist === 'yes',
             images: []
           };
@@ -791,6 +813,7 @@ async function handleApiRequest(req, res, pathname) {
           if (itemData.categoryId && !db.getCategories().some(c => c.id === itemData.categoryId)) {
             const cat = db.getCategories().find(c => c.name.toLowerCase() === itemData.categoryId.toLowerCase());
             if (cat) itemData.categoryId = cat.id;
+            else itemData.categoryId = ''; // couldn't match
           }
           if (itemData.subcategoryId) {
             const allSubs = db.getCategories().flatMap(c => c.subcategories);
@@ -799,15 +822,25 @@ async function handleApiRequest(req, res, pathname) {
               if (sub) {
                 itemData.subcategoryId = sub.id;
                 itemData.categoryId = sub.parent;
+              } else {
+                itemData.subcategoryId = ''; // couldn't match
               }
             }
           }
 
-          // Default category if none matched
-          if (!itemData.categoryId) itemData.categoryId = 'locomotives';
+          // Default category if none matched — warn if the CSV had a value that didn't resolve
+          if (!itemData.categoryId) {
+            itemData.categoryId = 'locomotives';
+            if (originalCategory) {
+              errors.push(`Row ${i + 1}: warning — category "${originalCategory}" not recognised, defaulted to Locomotives`);
+            }
+          }
           if (!itemData.subcategoryId) {
             const cat = db.getCategories().find(c => c.id === itemData.categoryId);
             itemData.subcategoryId = cat && cat.subcategories.length > 0 ? cat.subcategories[0].id : '';
+            if (originalSubcategory && !itemData.subcategoryId) {
+              errors.push(`Row ${i + 1}: warning — subcategory "${originalSubcategory}" not recognised`);
+            }
           }
 
           const item = db.createItem(itemData);
@@ -1126,7 +1159,8 @@ async function handleApiRequest(req, res, pathname) {
       const result = await valuation.searchEbay(item, {
         appId: settings.ebayAppId,
         certId: settings.ebayCertId,
-        sandbox: settings.ebaySandbox || false
+        sandbox: settings.ebaySandbox || false,
+        gauge: settings.ebayGauge || 'OO'
       });
 
       // Save valuation data to the item
@@ -1187,7 +1221,8 @@ async function handleApiRequest(req, res, pathname) {
       const results = await valuation.batchValuate(batch, {
         appId: settings.ebayAppId,
         certId: settings.ebayCertId,
-        sandbox: settings.ebaySandbox || false
+        sandbox: settings.ebaySandbox || false,
+        gauge: settings.ebayGauge || 'OO'
       });
 
       let updated = 0;
@@ -1265,6 +1300,7 @@ async function handleApiRequest(req, res, pathname) {
     if (data.ebayAppId !== undefined) updates.ebayAppId = data.ebayAppId.trim();
     if (data.ebayCertId !== undefined) updates.ebayCertId = data.ebayCertId.trim();
     if (data.ebaySandbox !== undefined) updates.ebaySandbox = !!data.ebaySandbox;
+    if (data.ebayGauge !== undefined) updates.ebayGauge = data.ebayGauge.trim();
     if (data.valuationAutoRefresh !== undefined) updates.valuationAutoRefresh = !!data.valuationAutoRefresh;
     if (data.valuationRefreshDays !== undefined) updates.valuationRefreshDays = parseInt(data.valuationRefreshDays) || 7;
 
@@ -1290,7 +1326,8 @@ async function handleApiRequest(req, res, pathname) {
       const result = await valuation.searchEbay(testItem, {
         appId: settings.ebayAppId,
         certId: settings.ebayCertId,
-        sandbox: settings.ebaySandbox || false
+        sandbox: settings.ebaySandbox || false,
+        gauge: settings.ebayGauge || 'OO'
       });
 
       return sendJson(res, 200, {
@@ -1513,7 +1550,8 @@ async function autoRefreshValuations() {
     const results = await valuation.batchValuate(batch, {
       appId: settings.ebayAppId,
       certId: settings.ebayCertId,
-      sandbox: settings.ebaySandbox || false
+      sandbox: settings.ebaySandbox || false,
+      gauge: settings.ebayGauge || 'OO'
     });
 
     let updated = 0;

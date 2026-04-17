@@ -16,8 +16,9 @@ Object.assign(app, {
     const certId = document.getElementById('settingsEbayCertId').value.trim();
     const autoRefresh = document.getElementById('settingsValuationAuto').checked;
     const refreshDays = parseInt(document.getElementById('settingsValuationDays').value) || 7;
+    const gauge = document.getElementById('settingsEbayGauge')?.value || 'OO';
 
-    const payload = { valuationAutoRefresh: autoRefresh, valuationRefreshDays: refreshDays };
+    const payload = { valuationAutoRefresh: autoRefresh, valuationRefreshDays: refreshDays, ebayGauge: gauge };
     // Only send credentials if user actually typed new ones (not just the placeholder)
     if (appId) payload.ebayAppId = appId;
     if (certId) payload.ebayCertId = certId;

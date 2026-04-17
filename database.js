@@ -54,6 +54,7 @@ const DEFAULT_SETTINGS = {
   ebayAppId: '',
   ebayCertId: '',
   ebaySandbox: false,
+  ebayGauge: 'OO',
   valuationAutoRefresh: true,
   valuationRefreshDays: 7
 };
@@ -480,14 +481,23 @@ function getSettings() {
   const settings = { ...DEFAULT_SETTINGS, ...(db.settings || {}) };
   // Never expose password hash/salt or full eBay credentials to the client
   const { passwordHash, passwordSalt, ...safeSettings } = settings;
+  // Check if credentials come from env vars (don't expose actual values either way)
+  const envAppId = process.env.EBAY_APP_ID;
+  const envCertId = process.env.EBAY_CERT_ID;
+  const effectiveAppId = envAppId || safeSettings.ebayAppId;
+  const effectiveCertId = envCertId || safeSettings.ebayCertId;
   // Mask eBay credentials (show only last 4 chars for confirmation)
-  if (safeSettings.ebayAppId) {
-    safeSettings.ebayAppIdMasked = '••••' + safeSettings.ebayAppId.slice(-4);
+  if (effectiveAppId) {
+    safeSettings.ebayAppIdMasked = envAppId ? '(env var)' : '••••' + safeSettings.ebayAppId.slice(-4);
   }
-  if (safeSettings.ebayCertId) {
-    safeSettings.ebayCertIdMasked = '••••' + safeSettings.ebayCertId.slice(-4);
+  if (effectiveCertId) {
+    safeSettings.ebayCertIdMasked = envCertId ? '(env var)' : '••••' + safeSettings.ebayCertId.slice(-4);
   }
-  safeSettings.ebayConfigured = !!(safeSettings.ebayAppId && safeSettings.ebayCertId);
+  safeSettings.ebayConfigured = !!(effectiveAppId && effectiveCertId);
+  safeSettings.ebayViaEnv = !!(envAppId || envCertId);
+  // Don't expose stored credential values
+  delete safeSettings.ebayAppId;
+  delete safeSettings.ebayCertId;
   return safeSettings;
 }
 
@@ -520,14 +530,18 @@ function verifyShareToken(token) {
 
 function getSettingsInternal() {
   const db = readDb();
-  return { ...DEFAULT_SETTINGS, ...(db.settings || {}) };
+  const settings = { ...DEFAULT_SETTINGS, ...(db.settings || {}) };
+  // Environment variables take precedence over stored credentials
+  if (process.env.EBAY_APP_ID) settings.ebayAppId = process.env.EBAY_APP_ID;
+  if (process.env.EBAY_CERT_ID) settings.ebayCertId = process.env.EBAY_CERT_ID;
+  return settings;
 }
 
 function updateSettings(updates) {
   const db = readDb();
   if (!db.settings) db.settings = { ...DEFAULT_SETTINGS };
   const allowed = ['appName', 'tagline', 'currency', 'serviceIntervalDays', 'shareToken',
-    'ebayAppId', 'ebayCertId', 'ebaySandbox', 'valuationAutoRefresh', 'valuationRefreshDays'];
+    'ebayAppId', 'ebayCertId', 'ebaySandbox', 'ebayGauge', 'valuationAutoRefresh', 'valuationRefreshDays'];
   for (const key of allowed) {
     if (updates[key] !== undefined) {
       db.settings[key] = updates[key];

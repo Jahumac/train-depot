@@ -19,6 +19,10 @@ const app = {
   advancedFilters: {},       // advanced search filters
   filterPanelOpen: false,    // advanced filter panel state
   dragSrcIndex: null,        // drag-and-drop image reorder
+  currentPage: 1,
+  itemsPerPage: 48,
+  totalItemCount: 0,
+  totalPages: 0,
 
   // ==================== Auto-Suggest Database ====================
 
@@ -563,7 +567,18 @@ const app = {
   },
 
   async loadItems(params = '') {
-    this.items = await this.api(`/api/items${params}`);
+    const separator = params.includes('?') ? '&' : '?';
+    const url = `/api/items${params}${separator}page=${this.currentPage}&limit=${this.itemsPerPage}`;
+    const result = await this.api(url);
+    if (result && result.items !== undefined) {
+      this.items = result.items;
+      this.totalItemCount = result.total;
+      this.totalPages = result.pages;
+    } else {
+      this.items = Array.isArray(result) ? result : [];
+      this.totalItemCount = this.items.length;
+      this.totalPages = 1;
+    }
   },
 
   async loadStats() {
@@ -621,6 +636,7 @@ const app = {
     this.currentView = 'catalog';
     this.currentFilter = filter;
     this.showWishlistOnly = false;
+    this.currentPage = 1;
     this.setNav('catalog');
 
     let params = '';
@@ -628,17 +644,10 @@ const app = {
       if (filter.type === 'search') params = `?search=${encodeURIComponent(filter.value)}`;
       else if (filter.type === 'category') params = `?category=${filter.value}`;
       else if (filter.type === 'subcategory') params = `?subcategory=${filter.value}`;
-      // Tag filtering is done client-side after loading all items
+      else if (filter.type === 'tag') params = `?tag=${encodeURIComponent(filter.value)}`;
     }
 
     await this.loadItems(params);
-
-    // Filter by tag if specified
-    if (filter && filter.type === 'tag') {
-      this.items = this.items.filter(item =>
-        item.tags && Array.isArray(item.tags) && item.tags.includes(filter.value)
-      );
-    }
 
     await this.loadStats();
     document.getElementById('statsBar').style.display = '';
@@ -765,7 +774,7 @@ const app = {
     const nonZero = Object.entries(s.bySubcategory).filter(([, v]) => v.count > 0);
     if (nonZero.length === 0) return '';
     return nonZero.map(([, v]) =>
-      `<span class="stat-tag"><span class="stat-value">${v.count}</span> ${v.name}</span>`
+      `<span class="stat-tag"><span class="stat-value">${v.count}</span> ${this.esc(v.name)}</span>`
     ).join('');
   },
 

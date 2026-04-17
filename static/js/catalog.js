@@ -122,7 +122,7 @@ Object.assign(app, {
             <div class="items-header">
               <div>
                 <h2 class="items-title">${filterTitle}</h2>
-                <span class="items-count">${this.getFilteredItems().length} item${this.getFilteredItems().length !== 1 ? 's' : ''}</span>
+                <span class="items-count">${this.totalItemCount} item${this.totalItemCount !== 1 ? 's' : ''}${this.totalPages > 1 ? ` · page ${this.currentPage} of ${this.totalPages}` : ''}</span>
               </div>
               <div class="items-header-actions">
                 <select class="sort-select" onchange="app.setSort(this.value)" title="Sort items">
@@ -142,6 +142,13 @@ Object.assign(app, {
               <div class="items-grid">
                 ${this.getFilteredItems().map(item => this.renderItemCard(item)).join('')}
               </div>
+              ${this.totalPages > 1 ? `
+                <div class="pagination-bar">
+                  <button class="btn btn-outline btn-sm" onclick="app.goToPage(${this.currentPage - 1})" ${this.currentPage <= 1 ? 'disabled' : ''}>← Prev</button>
+                  <span class="pagination-info">Page ${this.currentPage} of ${this.totalPages}</span>
+                  <button class="btn btn-outline btn-sm" onclick="app.goToPage(${this.currentPage + 1})" ${this.currentPage >= this.totalPages ? 'disabled' : ''}>Next →</button>
+                </div>
+              ` : ''}
             `}
           </div>
         </div>
@@ -172,7 +179,7 @@ Object.assign(app, {
           ` : ''}
           ${this.categories.map(cat => `
             <li class="category-group-label">
-              <span onclick="app.showCatalog({type:'category',value:'${cat.id}'})">${catIcon(cat.id)} ${cat.name}</span>
+              <span onclick="app.showCatalog({type:'category',value:'${cat.id}'})">${catIcon(cat.id)} ${this.esc(cat.name)}</span>
               <span class="cat-actions">
                 <button class="cat-action-btn" onclick="event.stopPropagation();app.addSubcategory('${cat.id}')" title="Add subcategory">+</button>
                 <button class="cat-action-btn" onclick="event.stopPropagation();app.renameCategory('${cat.id}')" title="Rename">✎</button>
@@ -183,7 +190,7 @@ Object.assign(app, {
               ${cat.subcategories.map(sub => `
                 <li class="subcategory-item ${this.currentFilter?.value === sub.id ? 'active' : ''}"
                     onclick="app.showCatalog({type:'subcategory',value:'${sub.id}'})">
-                  ${sub.name}
+                  ${this.esc(sub.name)}
                   <span class="subcat-actions">
                     <button class="cat-action-btn" onclick="event.stopPropagation();app.renameSubcategory('${cat.id}','${sub.id}')" title="Rename">✎</button>
                     <button class="cat-action-btn danger" onclick="event.stopPropagation();app.removeSubcategoryConfirm('${cat.id}','${sub.id}')" title="Delete">×</button>
@@ -255,7 +262,7 @@ Object.assign(app, {
       <div class="item-card" onclick="app.showDetail('${item.id}')">
         <div class="item-card-image">
           ${img}
-          ${subcatName ? `<span class="item-card-badge">${subcatName}</span>` : ''}
+          ${subcatName ? `<span class="item-card-badge">${this.esc(subcatName)}</span>` : ''}
           ${item.wishlist ? '<span class="item-card-wishlist-badge" title="Wishlist">⭐</span>' : ''}
           ${overdue ? '<span class="item-card-service-icon" title="Service overdue">🔧</span>' : ''}
           ${item.runningNumber ? `<span class="item-card-number">${this.esc(item.runningNumber)}</span>` : ''}
@@ -572,6 +579,23 @@ Object.assign(app, {
     }
     html += '</div>';
     return html;
+  },
+
+  // --- Pagination ---
+  async goToPage(page) {
+    if (page < 1 || page > this.totalPages) return;
+    this.currentPage = page;
+    let params = '';
+    if (this.currentFilter) {
+      if (this.currentFilter.type === 'search') params = `?search=${encodeURIComponent(this.currentFilter.value)}`;
+      else if (this.currentFilter.type === 'category') params = `?category=${this.currentFilter.value}`;
+      else if (this.currentFilter.type === 'subcategory') params = `?subcategory=${this.currentFilter.value}`;
+      else if (this.currentFilter.type === 'tag') params = `?tag=${encodeURIComponent(this.currentFilter.value)}`;
+    }
+    if (this.showWishlistOnly) params = (params ? params + '&' : '?') + 'wishlist=true';
+    await this.loadItems(params);
+    this.render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   },
 
   // --- Random Spotlight ---

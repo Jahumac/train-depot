@@ -50,7 +50,7 @@ Object.assign(app, {
               <div class="settings-form" id="passwordSection">
                 <div class="form-group">
                   <label class="form-label">New Password</label>
-                  <input type="password" class="form-input" id="settingsNewPassword" placeholder="Enter new password (4+ chars)">
+                  <input type="password" class="form-input" id="settingsNewPassword" placeholder="Enter new password (8+ chars)">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Confirm New Password</label>
@@ -71,16 +71,23 @@ Object.assign(app, {
               <h3>📊 eBay Valuation</h3>
               <p>Connect your eBay developer account to automatically look up market values for your trains based on real sold prices.</p>
               <div class="settings-form">
+                ${s.ebayViaEnv ? '<p style="font-size:0.85rem;padding:8px 12px;background:var(--color-surface);border-radius:6px;border:1px solid var(--color-border);">🔒 eBay credentials loaded from environment variables (<code>EBAY_APP_ID</code> / <code>EBAY_CERT_ID</code>). Fields below are disabled.</p>' : ''}
                 <div class="form-group">
                   <label class="form-label">eBay App ID (Client ID)</label>
-                  <input type="password" class="form-input" id="settingsEbayAppId" placeholder="${s.ebayAppIdMasked || 'Enter your eBay App ID...'}" autocomplete="off">
+                  <input type="password" class="form-input" id="settingsEbayAppId" placeholder="${s.ebayAppIdMasked || 'Enter your eBay App ID...'}" autocomplete="off" ${s.ebayViaEnv ? 'disabled' : ''}>
                   ${s.ebayConfigured ? '<span style="color:var(--color-success);font-size:0.8rem;">✓ Configured</span>' : '<span style="color:var(--color-text-muted);font-size:0.8rem;">Not configured</span>'}
                 </div>
                 <div class="form-group">
                   <label class="form-label">eBay Cert ID (Client Secret)</label>
-                  <input type="password" class="form-input" id="settingsEbayCertId" placeholder="${s.ebayCertIdMasked || 'Enter your eBay Cert ID...'}" autocomplete="off">
+                  <input type="password" class="form-input" id="settingsEbayCertId" placeholder="${s.ebayCertIdMasked || 'Enter your eBay Cert ID...'}" autocomplete="off" ${s.ebayViaEnv ? 'disabled' : ''}>
                 </div>
                 <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Collection Gauge</label>
+                    <select class="form-select" id="settingsEbayGauge" style="width:120px">
+                      ${['OO','N','HO','O','TT','Z','G'].map(g => `<option value="${g}" ${(s.ebayGauge || 'OO') === g ? 'selected' : ''}>${g} Gauge</option>`).join('')}
+                    </select>
+                  </div>
                   <div class="form-group">
                     <label class="form-label" style="display:flex;align-items:center;gap:8px;">
                       <input type="checkbox" id="settingsValuationAuto" ${s.valuationAutoRefresh ? 'checked' : ''}>
@@ -101,6 +108,7 @@ Object.assign(app, {
                 <p style="font-size:0.8rem;color:var(--color-text-muted);margin-top:12px;">
                   Get free eBay API credentials at <a href="https://developer.ebay.com/" target="_blank" rel="noopener" style="color:var(--color-accent);">developer.ebay.com</a> —
                   create an application and copy your Production App ID and Cert ID.
+                  For better security, set <code>EBAY_APP_ID</code> and <code>EBAY_CERT_ID</code> as environment variables instead.
                 </p>
               </div>
             </div>
@@ -304,6 +312,7 @@ Object.assign(app, {
 
   async toggleWishlist() {
     this.showWishlistOnly = !this.showWishlistOnly;
+    this.currentPage = 1;
     if (this.showWishlistOnly) {
       await this.loadItems('?wishlist=true');
     } else {
