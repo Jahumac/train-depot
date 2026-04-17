@@ -672,6 +672,7 @@ const app = {
     // Remember where the user was in the catalog so we can restore it on return
     if (this.currentView === 'catalog') {
       this.catalogScrollY = window.scrollY;
+      this.catalogPage = this.currentPage;
     }
     this.currentView = 'detail';
     try {
