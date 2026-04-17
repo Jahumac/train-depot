@@ -17,7 +17,7 @@ Object.assign(app, {
     this.currentLightboxIndex = 0;
     const firstImgUrl = item.images && item.images.length > 0 ? item.images[0] : null;
     const mainImg = firstImgUrl
-      ? `<img src="${firstImgUrl}" id="detailMainImg" alt="${this.esc(item.name)}" onclick="app.openLightbox(0)" style="cursor:pointer;">`
+      ? this._buildDetailMainImg(firstImgUrl, item, 0)
       : `<div class="detail-main-placeholder">${this.categorySilhouette(item.categoryId)}</div>`;
     // Inline CSS custom property powers the blurred hero backdrop that fills
     // the container behind portrait photos so they don't look marooned.
@@ -57,7 +57,7 @@ Object.assign(app, {
               ${item.images && item.images.length > 1 ? `
                 <div class="detail-thumbnails">
                   ${item.images.map((img, i) => `
-                    <div class="detail-thumb ${i === 0 ? 'active' : ''}" onclick="app.switchImage('${img}', this)" ondblclick="app.openLightbox(${i})">
+                    <div class="detail-thumb ${i === 0 ? 'active' : ''}" onclick="app.switchImage('${img}', this, ${i})" ondblclick="app.openLightbox(${i})">
                       <img src="${img}" alt="Photo ${i+1}" style="cursor:pointer;">
                     </div>
                   `).join('')}
@@ -174,12 +174,39 @@ Object.assign(app, {
 
   // ==================== Image Viewer ====================
 
-  switchImage(src, thumbEl) {
-    const mainImg = document.getElementById('detailMainImg');
-    if (mainImg) mainImg.src = src;
-    // Sync the blurred backdrop with the newly-selected main image
-    const heroBox = mainImg ? mainImg.closest('.detail-main-image') : null;
-    if (heroBox) heroBox.style.setProperty('--hero-bg', `url('${src}')`);
+  // Builds the main detail image element — cropped div if a crop is set,
+  // plain img (with focal point) otherwise. Lightbox always shows full image.
+  _buildDetailMainImg(url, item, idx) {
+    const crop = item?.imageCrops?.[url];
+    if (crop && crop.w > 0 && crop.h > 0) {
+      const bgSizeW = (100 / crop.w * 100).toFixed(1);
+      const bgSizeH = (100 / crop.h * 100).toFixed(1);
+      const bgPosX = crop.w >= 100 ? '0' : (crop.x / (100 - crop.w) * 100).toFixed(1);
+      const bgPosY = crop.h >= 100 ? '0' : (crop.y / (100 - crop.h) * 100).toFixed(1);
+      return `<div class="detail-main-img-crop" id="detailMainImg" onclick="app.openLightbox(${idx})"
+        style="background-image:url('${url}');background-size:${bgSizeW}% ${bgSizeH}%;background-position:${bgPosX}% ${bgPosY}%;"></div>`;
+    }
+    const fp = item?.imageFocalPoints?.[url];
+    const fpStyle = fp ? `object-position:${fp.x}% ${fp.y}%;` : '';
+    return `<img src="${url}" id="detailMainImg" alt="${this.esc(item?.name || '')}" onclick="app.openLightbox(${idx})" style="cursor:pointer;${fpStyle}">`;
+  },
+
+  switchImage(src, thumbEl, idx) {
+    if (idx !== undefined) this.currentLightboxIndex = idx;
+    const item = this.detailItem;
+    const heroBox = document.querySelector('.detail-main-image');
+    if (!heroBox) return;
+
+    // Replace the main image element in-place (preserves overlay badges)
+    const old = document.getElementById('detailMainImg');
+    const tmp = document.createElement('div');
+    tmp.innerHTML = this._buildDetailMainImg(src, item, this.currentLightboxIndex);
+    const newEl = tmp.firstChild;
+    if (old) old.replaceWith(newEl);
+    else heroBox.insertBefore(newEl, heroBox.firstChild);
+
+    // Sync the blurred hero backdrop
+    heroBox.style.setProperty('--hero-bg', `url('${src}')`);
     document.querySelectorAll('.detail-thumb').forEach(t => t.classList.remove('active'));
     if (thumbEl) thumbEl.classList.add('active');
   },

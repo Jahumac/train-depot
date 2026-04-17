@@ -1149,6 +1149,18 @@ body.drawer-open { overflow: hidden; }
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
 }
 
+/* Cropped detail view image — same background-image technique as catalog cards */
+.detail-main-img-crop {
+  width: 100%;
+  min-height: 360px;
+  max-height: 560px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  align-self: stretch;
+}
+
 /* Keep corner overlays above the blurred backdrop */
 .detail-main-image .detail-hero-wishlist,
 .detail-main-image .detail-hero-service,
