@@ -598,6 +598,87 @@ Object.assign(app, {
     }
   },
 
+  // ==================== Wikipedia Fetch ====================
+
+  async fetchWikipedia() {
+    const name = (document.getElementById('formName')?.value || '').trim();
+    const number = (document.getElementById('formRunningNumber')?.value || '').trim();
+    const query = [name, number].filter(Boolean).join(' ');
+    if (!query) { this.showToast('Enter a locomotive name first', 'warning'); return; }
+
+    const btn = document.getElementById('wikiFetchBtn');
+    const preview = document.getElementById('wikiPreview');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Searching…'; }
+
+    try {
+      const data = await this.api(`/api/wikipedia?q=${encodeURIComponent(query)}`);
+
+      if (!data.found) {
+        preview.style.display = 'block';
+        preview.innerHTML = `<p class="wiki-preview-empty">No Wikipedia article found for "<strong>${this.esc(query)}</strong>".</p>`;
+        return;
+      }
+
+      this._renderWikiPreview(preview, data);
+    } catch (e) {
+      this.showToast('Wikipedia lookup failed', 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '🌐 Wikipedia'; }
+    }
+  },
+
+  async fetchWikipediaDirect(title) {
+    const btn = document.getElementById('wikiFetchBtn');
+    const preview = document.getElementById('wikiPreview');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Searching…'; }
+
+    try {
+      const data = await this.api(`/api/wikipedia?q=${encodeURIComponent(title)}`);
+      if (!data.found) { this.showToast('Article not found', 'warning'); return; }
+      this._renderWikiPreview(preview, data);
+    } catch (e) {
+      this.showToast('Wikipedia lookup failed', 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '🌐 Wikipedia'; }
+    }
+  },
+
+  _renderWikiPreview(preview, data) {
+    const otherBtns = (data.otherTitles || []).map(t =>
+      `<button type="button" class="btn btn-outline btn-sm" onclick="app.fetchWikipediaDirect(${JSON.stringify(t)})">${this.esc(t)}</button>`
+    ).join('');
+
+    const escapedExtract = data.extract.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+
+    preview.style.display = 'block';
+    preview.innerHTML = `
+      <div class="wiki-preview">
+        <div class="wiki-preview-title">
+          <strong>${this.esc(data.title)}</strong>
+          <a href="${this.esc(data.url)}" target="_blank" rel="noopener" class="wiki-preview-link">↗ Wikipedia</a>
+        </div>
+        <p class="wiki-preview-extract">${this.esc(data.extract)}</p>
+        <div class="wiki-preview-actions">
+          <button type="button" class="btn btn-primary btn-sm" id="wikiAcceptBtn">Use this</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="app.dismissWikiPreview()">Dismiss</button>
+        </div>
+        ${otherBtns ? `<div class="wiki-preview-others"><span>Other results:</span>${otherBtns}</div>` : ''}
+      </div>
+    `;
+    preview.querySelector('#wikiAcceptBtn').addEventListener('click', () => this.acceptWikiText(data.extract));
+  },
+
+  acceptWikiText(text) {
+    const ta = document.getElementById('formHistory');
+    if (ta) ta.value = text;
+    this.dismissWikiPreview();
+  },
+
+  dismissWikiPreview() {
+    const preview = document.getElementById('wikiPreview');
+    if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
+  },
+
   // ==================== Wishlist fields + Product Code auto-detect ====================
 
   // ==================== Product Code Auto-Detect Manufacturer ====================

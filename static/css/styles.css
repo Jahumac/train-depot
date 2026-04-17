@@ -3483,6 +3483,65 @@ body.drawer-open { overflow: hidden; }
   margin: 8px 20px 8px 40px;
 }
 
+/* ==================== Wikipedia Preview Panel ==================== */
+
+.wiki-preview {
+  margin-top: 10px;
+  padding: 14px 16px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+}
+
+.wiki-preview-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.wiki-preview-link {
+  font-size: 0.8rem;
+  color: var(--color-accent);
+  text-decoration: none;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.wiki-preview-link:hover { text-decoration: underline; }
+
+.wiki-preview-extract {
+  color: var(--color-text-light);
+  line-height: 1.6;
+  margin: 0 0 12px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.wiki-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.wiki-preview-others {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.wiki-preview-empty {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
 /* Tag chips on catalog cards — makes the tag system visible in context */
 .item-card-tags {
   display: flex;

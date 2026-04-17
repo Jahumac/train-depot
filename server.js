@@ -998,6 +998,52 @@ async function handleApiRequest(req, res, pathname) {
     return sendJson(res, 200, db.getStats());
   }
 
+  // GET /api/wikipedia?q=... — proxy Wikipedia search to avoid browser CORS
+  if (pathname === '/api/wikipedia' && req.method === 'GET') {
+    const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const q = (reqUrl.searchParams.get('q') || '').trim();
+    const offset = parseInt(reqUrl.searchParams.get('offset') || '0');
+    if (!q) return sendError(res, 400, 'Missing query');
+
+    const https = require('https');
+    const wikiSearch = (query) => new Promise((resolve, reject) => {
+      const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=5&sroffset=${offset}`;
+      https.get(url, { headers: { 'User-Agent': 'TrainDepot/1.0 (model train catalog)' } }, (r) => {
+        let data = '';
+        r.on('data', c => data += c);
+        r.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+      }).on('error', reject);
+    });
+
+    const wikiSummary = (title) => new Promise((resolve, reject) => {
+      const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+      https.get(url, { headers: { 'User-Agent': 'TrainDepot/1.0 (model train catalog)' } }, (r) => {
+        let data = '';
+        r.on('data', c => data += c);
+        r.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+      }).on('error', reject);
+    });
+
+    try {
+      const search = await wikiSearch(q);
+      const results = search?.query?.search || [];
+      if (results.length === 0) return sendJson(res, 200, { found: false, total: 0 });
+
+      const summary = await wikiSummary(results[0].title);
+      return sendJson(res, 200, {
+        found: true,
+        total: results.length + offset,
+        offset,
+        title: summary.title,
+        extract: summary.extract,
+        url: summary.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(results[0].title)}`,
+        otherTitles: results.slice(1).map(r => r.title)
+      });
+    } catch (e) {
+      return sendError(res, 502, 'Wikipedia lookup failed');
+    }
+  }
+
   // GET /api/export
   if (pathname === '/api/export' && req.method === 'GET') {
     const data = db.exportData();
