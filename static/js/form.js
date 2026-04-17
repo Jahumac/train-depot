@@ -17,6 +17,7 @@ Object.assign(app, {
     this.pendingImages = [];
     this.existingImages = [];
     this._focalPoints = {};
+    this._crops = {};
     document.getElementById('modalTitle').textContent = 'Add New Item';
     this.populateCategorySelects();
     this.clearForm();
@@ -43,6 +44,7 @@ Object.assign(app, {
     this.pendingImages = [];
     this.existingImages = [...(item.images || [])];
     this._focalPoints = item.imageFocalPoints ? { ...item.imageFocalPoints } : {};
+    this._crops = item.imageCrops ? { ...item.imageCrops } : {};
 
     document.getElementById('modalTitle').textContent = 'Edit Item';
     this.populateCategorySelects(item.categoryId);
@@ -159,10 +161,12 @@ Object.assign(app, {
       const div = document.createElement('div');
       div.className = 'upload-preview';
       const hasFocal = this._focalPoints && this._focalPoints[url];
+      const hasCrop = this._crops && this._crops[url];
       div.innerHTML = `
         <img src="${url}" alt="Photo">
         <button class="upload-preview-remove" onclick="app.removeExistingImage(${i})">&times;</button>
         <button class="upload-preview-focal ${hasFocal ? 'has-focal' : ''}" onclick="event.stopPropagation();app.openFocalPicker(${i})" title="Set thumbnail focus">📌</button>
+        <button class="upload-preview-crop ${hasCrop ? 'has-crop' : ''}" onclick="event.stopPropagation();app.openCropPicker(${i})" title="Set catalog crop">✂️</button>
       `;
       container.appendChild(div);
     });
@@ -255,7 +259,8 @@ Object.assign(app, {
         wishlistSpottedAt: document.getElementById('formWishlistSpottedAt')?.value.trim() || '',
         tags: tags,
         images: allImages,
-        imageFocalPoints: this._focalPoints || {}
+        imageFocalPoints: this._focalPoints || {},
+        imageCrops: this._crops || {}
       };
 
       if (this.editingItem) {
@@ -481,6 +486,115 @@ Object.assign(app, {
     if (this._focalPickerOverlay) {
       this._focalPickerOverlay.remove();
       this._focalPickerOverlay = null;
+    }
+  },
+
+  // ==================== Crop Picker ====================
+
+  openCropPicker(imageIndex) {
+    const url = this.existingImages[imageIndex];
+    if (!url) return;
+
+    const existing = this._crops && this._crops[url];
+
+    const overlay = document.createElement('div');
+    overlay.className = 'focal-picker-overlay';
+    overlay.innerHTML = `
+      <div class="focal-picker-container">
+        <p class="focal-picker-hint">Drag to select the area to show in catalog cards · full image still shown on detail view</p>
+        <div class="crop-picker-image-wrap">
+          <img src="${url}" class="focal-picker-img" alt="Set crop region" draggable="false">
+          <div class="crop-picker-rect" id="cropRect" style="${existing ? `left:${existing.x}%;top:${existing.y}%;width:${existing.w}%;height:${existing.h}%;display:block` : 'display:none'}"></div>
+        </div>
+        <div class="focal-picker-actions">
+          <button class="btn btn-outline btn-sm" onclick="app.closeCropPicker(false)">Cancel</button>
+          ${existing ? '<button class="btn btn-outline btn-sm" onclick="app.clearCropRegion()">Reset</button>' : ''}
+          <button class="btn btn-primary btn-sm" onclick="app.closeCropPicker(true)">Apply Crop</button>
+        </div>
+      </div>
+    `;
+
+    this._cropPickerUrl = url;
+    this._cropPickerValue = existing ? { ...existing } : null;
+
+    const imgWrap = overlay.querySelector('.crop-picker-image-wrap');
+    const rectEl = overlay.querySelector('#cropRect');
+
+    let isDragging = false;
+    let startX = 0, startY = 0;
+
+    const getPos = (e) => {
+      const bounds = imgWrap.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: Math.max(0, Math.min(100, (clientX - bounds.left) / bounds.width * 100)),
+        y: Math.max(0, Math.min(100, (clientY - bounds.top) / bounds.height * 100))
+      };
+    };
+
+    const onStart = (e) => {
+      e.preventDefault();
+      isDragging = true;
+      const pos = getPos(e);
+      startX = pos.x; startY = pos.y;
+      rectEl.style.cssText = `left:${startX}%;top:${startY}%;width:0%;height:0%;display:block`;
+      this._cropPickerValue = null;
+    };
+
+    const onMove = (e) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      const pos = getPos(e);
+      const x = Math.min(startX, pos.x);
+      const y = Math.min(startY, pos.y);
+      const w = Math.abs(pos.x - startX);
+      const h = Math.abs(pos.y - startY);
+      rectEl.style.left = x + '%';
+      rectEl.style.top = y + '%';
+      rectEl.style.width = w + '%';
+      rectEl.style.height = h + '%';
+      this._cropPickerValue = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+    };
+
+    const onEnd = () => {
+      isDragging = false;
+      if (this._cropPickerValue && (this._cropPickerValue.w < 5 || this._cropPickerValue.h < 5)) {
+        this._cropPickerValue = null;
+        rectEl.style.display = 'none';
+      }
+    };
+
+    imgWrap.addEventListener('mousedown', onStart);
+    imgWrap.addEventListener('mousemove', onMove);
+    imgWrap.addEventListener('mouseup', onEnd);
+    imgWrap.addEventListener('touchstart', onStart, { passive: false });
+    imgWrap.addEventListener('touchmove', onMove, { passive: false });
+    imgWrap.addEventListener('touchend', onEnd);
+
+    document.body.appendChild(overlay);
+    this._cropPickerOverlay = overlay;
+  },
+
+  clearCropRegion() {
+    this._cropPickerValue = null;
+    const rectEl = this._cropPickerOverlay?.querySelector('#cropRect');
+    if (rectEl) rectEl.style.display = 'none';
+  },
+
+  closeCropPicker(save) {
+    if (save && this._cropPickerUrl) {
+      if (this._cropPickerValue && this._cropPickerValue.w > 0 && this._cropPickerValue.h > 0) {
+        if (!this._crops) this._crops = {};
+        this._crops[this._cropPickerUrl] = this._cropPickerValue;
+      } else {
+        if (this._crops) delete this._crops[this._cropPickerUrl];
+      }
+      this.renderUploadPreviews();
+    }
+    if (this._cropPickerOverlay) {
+      this._cropPickerOverlay.remove();
+      this._cropPickerOverlay = null;
     }
   },
 

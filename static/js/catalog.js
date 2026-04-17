@@ -242,9 +242,19 @@ Object.assign(app, {
   renderItemCard(item) {
     let img;
     if (item.images && item.images.length > 0) {
-      const fp = item.imageFocalPoints && item.imageFocalPoints[item.images[0]];
-      const posStyle = fp ? ` style="object-position:${fp.x}% ${fp.y}%"` : '';
-      img = `<img src="${item.images[0]}" alt="${this.esc(item.name)}" loading="lazy"${posStyle}>`;
+      const imgUrl = item.images[0];
+      const crop = item.imageCrops && item.imageCrops[imgUrl];
+      if (crop && crop.w > 0 && crop.h > 0) {
+        const bgSizeW = (100 / crop.w * 100).toFixed(1);
+        const bgSizeH = (100 / crop.h * 100).toFixed(1);
+        const bgPosX = crop.w >= 100 ? 0 : (crop.x / (100 - crop.w) * 100).toFixed(1);
+        const bgPosY = crop.h >= 100 ? 0 : (crop.y / (100 - crop.h) * 100).toFixed(1);
+        img = `<div class="item-card-image-crop" style="background-image:url('${imgUrl}');background-size:${bgSizeW}% ${bgSizeH}%;background-position:${bgPosX}% ${bgPosY}%;"></div>`;
+      } else {
+        const fp = item.imageFocalPoints && item.imageFocalPoints[imgUrl];
+        const posStyle = fp ? ` style="object-position:${fp.x}% ${fp.y}%"` : '';
+        img = `<img src="${imgUrl}" alt="${this.esc(item.name)}" loading="lazy"${posStyle}>`;
+      }
     } else {
       img = `<div class="item-card-placeholder">${this.categorySilhouette(item.categoryId)}</div>`;
     }

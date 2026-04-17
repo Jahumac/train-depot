@@ -879,6 +879,12 @@ body.drawer-open { overflow: hidden; }
   object-fit: cover;
 }
 
+.item-card-image-crop {
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+}
+
 .item-card-placeholder {
   position: absolute;
   inset: 0;
@@ -1701,6 +1707,30 @@ body.drawer-open { overflow: hidden; }
   background: rgba(0,0,0,0.75);
 }
 
+.upload-preview-crop {
+  position: absolute;
+  bottom: 2px;
+  right: 30px;
+  width: 24px;
+  height: 24px;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.upload-preview-crop:hover,
+.upload-preview-crop.has-crop {
+  opacity: 1;
+  background: rgba(0,0,0,0.75);
+}
+
 /* --- Focal Point Picker Overlay --- */
 .focal-picker-overlay {
   position: fixed;
@@ -1783,6 +1813,35 @@ body.drawer-open { overflow: hidden; }
 .focal-picker-actions {
   display: flex;
   gap: 10px;
+}
+
+/* --- Crop Picker --- */
+.crop-picker-image-wrap {
+  position: relative;
+  width: 100%;
+  max-height: 70vh;
+  overflow: hidden;
+  border-radius: 8px;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.crop-picker-image-wrap img {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.crop-picker-rect {
+  position: absolute;
+  border: 2px solid #fff;
+  background: rgba(255,255,255,0.15);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
+  pointer-events: none;
+  display: none;
 }
 
 /* --- Empty State --- */
@@ -2230,8 +2289,8 @@ body.drawer-open { overflow: hidden; }
   .item-card-image {
     flex: 0 0 112px;
     width: 112px;
-    height: auto;
-    min-height: 104px;
+    height: 112px;
+    min-height: unset;
     align-self: stretch;
     background: var(--color-bg);
     border-right: 1px solid var(--color-border);
