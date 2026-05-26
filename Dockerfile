@@ -17,8 +17,8 @@ COPY static/ ./static/
 RUN mkdir -p /app/data /app/data/uploads \
     && chmod +x start.sh 2>/dev/null || true
 
-# Persistent volumes for user data
-VOLUME ["/app/data", "/app/static/images/uploads"]
+# Persistent volume for catalogue data, sessions, and uploaded photos
+VOLUME ["/app/data"]
 
 EXPOSE 8005
 

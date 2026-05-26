@@ -11,7 +11,8 @@ const db = require('./database');
 const valuation = require('./valuation');
 
 const PORT = process.env.PORT || 8005;
-const UPLOAD_DIR = path.join(__dirname, 'data', 'uploads');
+const DATA_DIR = process.env.TRAIN_DEPOT_DATA_DIR || path.join(__dirname, 'data');
+const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const MAX_BODY_SIZE = 50 * 1024 * 1024;   // 50 MB overall request limit
 const MAX_FILE_SIZE = 10 * 1024 * 1024;    // 10 MB per uploaded file
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -41,7 +42,7 @@ const MIME_TYPES = {
 
 // ==================== Session Store (disk-backed) ====================
 
-const SESSIONS_FILE = path.join(__dirname, 'data', 'sessions.json');
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const sessions = new Map();
 
 // Load persisted sessions from disk on startup
@@ -126,12 +127,23 @@ function isValidSession(req) {
 
 // ==================== Local-Network Trust ====================
 
-// RFC 1918 / loopback ranges — requests from these IPs skip password.
-// Behind NPM (reverse proxy), the real client IP arrives via X-Forwarded-For.
+// Local/private-network password bypass is optional and disabled by default.
+// If TRAIN_DEPOT_TRUST_PROXY=true, X-Forwarded-For is only used when the
+// direct socket address is private (typical Nginx Proxy Manager / Docker setup).
+function envFlag(name, defaultValue = false) {
+  const value = process.env[name];
+  if (value === undefined) return defaultValue;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+}
+
+const TRUST_PROXY = envFlag('TRAIN_DEPOT_TRUST_PROXY', false);
+const TRUST_LOCAL_NETWORK = envFlag('TRAIN_DEPOT_TRUST_LOCAL_NETWORK', false);
+
 function getClientIp(req) {
+  const socketIp = req.socket.remoteAddress || '';
   const xff = req.headers['x-forwarded-for'];
-  if (xff) return xff.split(',')[0].trim();
-  return req.socket.remoteAddress || '';
+  if (TRUST_PROXY && xff && isPrivateIp(socketIp)) return xff.split(',')[0].trim();
+  return socketIp;
 }
 
 function isPrivateIp(ip) {
@@ -152,8 +164,10 @@ function isPrivateIp(ip) {
 function isAuthenticated(req) {
   // If no password is set, everything is open
   if (!db.hasPassword()) return true;
-  // Local network is always trusted (homelab convenience)
-  if (isPrivateIp(getClientIp(req))) return true;
+  // Optional homelab convenience: if explicitly enabled, local/private clients
+  // can skip the password. Disabled by default so exposed reverse-proxy setups
+  // cannot be opened by a spoofed X-Forwarded-For header.
+  if (TRUST_LOCAL_NETWORK && isPrivateIp(getClientIp(req))) return true;
   return isValidSession(req);
 }
 

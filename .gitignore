@@ -1,12 +1,11 @@
 # Dependencies
 node_modules/
 
-# Database (user data - not tracked)
+# Database and user data (not tracked)
 data/catalog.json
-
-# Uploaded images (user content)
-static/images/uploads/*
-!static/images/uploads/.gitkeep
+data/sessions.json
+data/uploads/*
+!data/.gitkeep
 
 # OS files
 .DS_Store

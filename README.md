@@ -2,7 +2,7 @@
 
 A self-hosted digital catalog for managing your model train collection. Built with zero external dependencies using only Node.js built-in modules.
 
-![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-green) ![License](https://img.shields.io/badge/License-MIT-blue) ![Version](https://img.shields.io/badge/Version-1.0.0-gold)
+![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-green) ![License](https://img.shields.io/badge/License-MIT-blue) ![Version](https://img.shields.io/badge/Version-1.4.0-gold)
 
 ## Features
 
@@ -67,13 +67,24 @@ train-depot/
 ├── start.sh                  # Quick-start shell script
 ├── Dockerfile                # Docker container configuration
 ├── data/
-│   └── catalog.json          # Database file (auto-created on first run)
+│   ├── catalog.json          # Database file (auto-created on first run)
+│   ├── sessions.json         # Login sessions (auto-created when needed)
+│   └── uploads/              # Uploaded collection photos
 └── static/
     ├── index.html            # Single-page app shell
+    ├── login.html            # Password setup/login page
+    ├── shared.html           # Public shared read-only view
     ├── css/
     │   └── styles.css        # Green & gold theme with dark mode + print styles
     └── js/
-        ├── app.js            # Frontend SPA logic
+        ├── app.js            # Main frontend app shell/state
+        ├── auth.js           # Login/logout helpers
+        ├── catalog.js        # Catalogue list/search/rendering
+        ├── detail.js         # Item detail view
+        ├── form.js           # Add/edit item form logic
+        ├── layout.js         # Layout/photo-zone view
+        ├── settings.js       # Settings/backup UI
+        ├── valuation.js      # eBay valuation UI
         └── reference-db.js   # Reference database of known models
 ```
 
@@ -98,11 +109,23 @@ train-depot/
 
 ```bash
 npm start      # Start the server on port 8005
+npm test       # Run zero-dependency smoke/regression tests
 npm run seed   # Populate the database with sample data
 npm run dev    # Start with --watch for auto-restart on changes (Node 18.11+)
 ```
 
 The port can be changed by setting the `PORT` environment variable: `PORT=9000 npm start`
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8005` | HTTP port |
+| `TRAIN_DEPOT_DATA_DIR` | `./data` | Catalogue data, sessions, and uploaded photos directory |
+| `TRAIN_DEPOT_TRUST_LOCAL_NETWORK` | `false` | Set to `true` to let private/LAN clients skip password login |
+| `TRAIN_DEPOT_TRUST_PROXY` | `false` | Set to `true` only behind a trusted reverse proxy that controls `X-Forwarded-For` |
+
+If you expose Train Depot through a reverse proxy, keep `TRAIN_DEPOT_TRUST_LOCAL_NETWORK=false` unless you are certain the proxy strips/replaces client-supplied forwarding headers.
 
 ## License
 
