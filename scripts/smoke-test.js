@@ -42,7 +42,10 @@ async function waitForServer() {
 }
 
 async function request(pathname, options = {}) {
-  const res = await fetch(`${baseUrl}${pathname}`, options);
+  const { raw = false, ...fetchOptions } = options;
+  const res = await fetch(`${baseUrl}${pathname}`, fetchOptions);
+  if (raw) return { res, body: null };
+
   let body = null;
   const text = await res.text();
   if (text) {
@@ -50,6 +53,20 @@ async function request(pathname, options = {}) {
     catch { body = text; }
   }
   return { res, body };
+}
+
+function makeMultipartBody(fieldName, filename, data, contentType = 'application/octet-stream') {
+  const boundary = '----TrainDepotSmokeBoundary' + Math.random().toString(16).slice(2);
+  const head = Buffer.from(
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="${fieldName}"; filename="${filename}"\r\n` +
+    `Content-Type: ${contentType}\r\n\r\n`
+  );
+  const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
+  return {
+    boundary,
+    body: Buffer.concat([head, Buffer.isBuffer(data) ? data : Buffer.from(data), tail])
+  };
 }
 
 async function main() {
@@ -137,6 +154,29 @@ async function main() {
   r = await request('/api/export');
   assert.strictEqual(r.res.status, 200, 'JSON export should work');
   assert.ok(r.body.items && Array.isArray(r.body.items), 'export should include items array');
+
+  // Regression: full-backup restore must replace the upload library, not merge into
+  // whatever photos happen to be lying around already.
+  const uploadsDir = path.join(dataDir, 'uploads');
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  fs.writeFileSync(path.join(uploadsDir, 'kept-photo.txt'), 'photo from backup');
+
+  r = await request('/api/export/full', { raw: true });
+  assert.strictEqual(r.res.status, 200, 'full export should work');
+  const fullBackupZip = Buffer.from(await r.res.arrayBuffer());
+
+  fs.writeFileSync(path.join(uploadsDir, 'orphan-photo.txt'), 'should be removed on restore');
+  assert.ok(fs.existsSync(path.join(uploadsDir, 'orphan-photo.txt')), 'orphan file should exist before restore');
+
+  const multipart = makeMultipartBody('file', 'train-depot-full-backup.zip', fullBackupZip, 'application/zip');
+  r = await request('/api/import/full', {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/form-data; boundary=${multipart.boundary}` },
+    body: multipart.body
+  });
+  assert.strictEqual(r.res.status, 200, 'full import should work');
+  assert.ok(fs.existsSync(path.join(uploadsDir, 'kept-photo.txt')), 'backup photo should still exist after restore');
+  assert.ok(!fs.existsSync(path.join(uploadsDir, 'orphan-photo.txt')), 'restore should remove photos not present in the backup');
 
   cleanup();
   console.log('Smoke tests passed');

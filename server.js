@@ -1182,8 +1182,10 @@ async function handleApiRequest(req, res, pathname) {
       return sendError(res, 400, 'Invalid data.json inside ZIP: ' + e.message);
     }
 
-    // Restore photos. Use basename only — guard against path-traversal.
-    if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    // Restore photos as an exact snapshot. A full-backup restore should not leave
+    // behind orphaned uploads from whatever happened to be on disk before.
+    fs.rmSync(UPLOAD_DIR, { recursive: true, force: true });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     let photoCount = 0;
     for (const entry of entries) {
       if (entry.name === 'data.json') continue;
