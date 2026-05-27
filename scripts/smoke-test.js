@@ -151,9 +151,31 @@ async function main() {
   assert.strictEqual(r.res.status, 200, 'trash list should work');
   assert.strictEqual(r.body.length, 1, 'soft-deleted item should appear in trash');
 
+  r = await request('/api/share/enable', { method: 'POST' });
+  assert.strictEqual(r.res.status, 200, 'share link enable should work');
+  assert.ok(r.body.token, 'share enable should return a token');
+
   r = await request('/api/export');
   assert.strictEqual(r.res.status, 200, 'JSON export should work');
   assert.ok(r.body.items && Array.isArray(r.body.items), 'export should include items array');
+  assert.ok(r.body.settings, 'export should include settings');
+  assert.ok(!('shareToken' in r.body.settings), 'JSON export must not include a live public share token');
+  const jsonBackup = r.body;
+
+  r = await request('/api/share/disable', { method: 'POST' });
+  assert.strictEqual(r.res.status, 200, 'share link disable should work');
+
+  const jsonImport = makeMultipartBody('file', 'train-depot-backup.json', JSON.stringify(jsonBackup), 'application/json');
+  r = await request('/api/import', {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/form-data; boundary=${jsonImport.boundary}` },
+    body: jsonImport.body
+  });
+  assert.strictEqual(r.res.status, 200, 'JSON import should work');
+
+  r = await request('/api/share/status');
+  assert.strictEqual(r.res.status, 200, 'share status should work');
+  assert.strictEqual(r.body.enabled, false, 'JSON import must not re-enable an old public share link');
 
   // Regression: full-backup restore must replace the upload library, not merge into
   // whatever photos happen to be lying around already.

@@ -558,11 +558,12 @@ function updateSettings(updates) {
 
 function exportData() {
   const db = readDb();
-  // Exclude password from exports
+  // Exclude password and live share-link tokens from exports.
   const exportDb = JSON.parse(JSON.stringify(db));
   if (exportDb.settings) {
     delete exportDb.settings.passwordHash;
     delete exportDb.settings.passwordSalt;
+    delete exportDb.settings.shareToken;
   }
   return JSON.stringify(exportDb, null, 2);
 }
@@ -625,16 +626,18 @@ function importData(jsonString) {
     };
   }
 
-  // Preserve existing password when importing (don't overwrite auth)
+  // Preserve existing password and live share-link state when importing.
   const currentDb = readDb();
   const currentPassword = currentDb.settings?.passwordHash || '';
   const currentSalt = currentDb.settings?.passwordSalt || '';
+  const currentShareToken = currentDb.settings?.shareToken || '';
 
   // Ensure settings exist (merge with defaults for older backups)
   data.settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
-  // Restore password from current DB
+  // Restore sensitive live state from current DB rather than the backup.
   data.settings.passwordHash = currentPassword;
   data.settings.passwordSalt = currentSalt;
+  data.settings.shareToken = currentShareToken;
 
   writeDb(data);
   return true;
