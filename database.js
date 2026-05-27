@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const DB_DIR = path.join(__dirname, 'data');
+const DB_DIR = process.env.TRAIN_DEPOT_DATA_DIR || path.join(__dirname, 'data');
 const DB_FILE = path.join(DB_DIR, 'catalog.json');
 
 // Default category structure
