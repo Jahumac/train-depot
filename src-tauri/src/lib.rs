@@ -122,6 +122,12 @@ pub struct CollectionStats {
     pub total_wishlist: i64,
     pub total_trash: i64,
     pub overdue_service: i64,
+    #[serde(default)]
+    pub wishlist_count: i64,
+    #[serde(default)]
+    pub by_subcategory: serde_json::Value,
+    #[serde(default)]
+    pub by_category: serde_json::Value,
 }
 
 // ── App state ───────────────────────────────────────────────────────────────

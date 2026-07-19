@@ -455,6 +455,42 @@ impl Database {
             )
             .map_err(|e| e.to_string())?;
 
+        // Build bySubcategory and byCategory maps
+        let categories = self.get_categories()?;
+        let mut by_subcategory = serde_json::Map::new();
+        let mut by_category = serde_json::Map::new();
+
+        for cat in &categories {
+            let count: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM items WHERE category_id=?1 AND deleted_at IS NULL",
+                params![cat.id],
+                |row| row.get(0),
+            ).unwrap_or(0);
+            by_category.insert(cat.id.clone(), serde_json::json!({
+                "name": cat.name,
+                "count": count
+            }));
+
+            for sub in &cat.subcategories {
+                let sub_count: i64 = self.conn.query_row(
+                    "SELECT COUNT(*) FROM items WHERE subcategory_id=?1 AND deleted_at IS NULL",
+                    params![sub.id],
+                    |row| row.get(0),
+                ).unwrap_or(0);
+                by_subcategory.insert(sub.id.clone(), serde_json::json!({
+                    "name": sub.name,
+                    "parent": cat.id,
+                    "count": sub_count
+                }));
+            }
+        }
+
+        let wishlist_count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM items WHERE wishlist=1 AND deleted_at IS NULL",
+            [],
+            |row| row.get(0),
+        ).unwrap_or(0);
+
         Ok(CollectionStats {
             total_items,
             total_spent,
@@ -464,6 +500,9 @@ impl Database {
             total_wishlist,
             total_trash,
             overdue_service,
+            wishlist_count,
+            by_subcategory: serde_json::Value::Object(by_subcategory),
+            by_category: serde_json::Value::Object(by_category),
         })
     }
 
