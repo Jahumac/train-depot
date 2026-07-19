@@ -48,10 +48,9 @@ const DataAdapter = {
 
   // ── Tauri mode (Desktop) ────────────────────────────────────
   async _tauriRequest(endpoint, options = {}) {
-    // Tauri invoke commands map REST endpoints to Rust functions
-    // e.g. GET /api/items → invoke('get_items')
-    //      POST /api/items → invoke('create_item', { body: ... })
-    const { invoke } = window.__TAURI__?.core || {};
+    // Tauri v2: invoke is on __TAURI_INTERNALS__, not __TAURI__
+    const invoke = window.__TAURI_INTERNALS__?.invoke
+                || window.__TAURI__?.core?.invoke;
     if (!invoke) throw new Error('Tauri bridge not available');
 
     const [method, path] = this._parseEndpoint(endpoint);
@@ -158,7 +157,7 @@ const DataAdapter = {
 
 // Auto-detect mode from the environment
 (function detectMode() {
-  if (window.__TAURI__) {
+  if (window.__TAURI_INTERNALS__ || window.__TAURI__) {
     DataAdapter.init('tauri');
   } else if (window.__CAPACITOR__) {
     DataAdapter.init('capacitor');
