@@ -820,7 +820,6 @@ Object.assign(app, {
   async _extractJsonFromZip(buf) {
     // Read the ZIP buffer and extract data.json
     const bytes = new Uint8Array(buf);
-    let pos = 0;
 
     // Find EOCD record
     let eocd = -1;
@@ -837,6 +836,8 @@ Object.assign(app, {
     let p = cdOffset;
     for (let e = 0; e < totalEntries; e++) {
       if (bytes[p] !== 0x50 || bytes[p+1] !== 0x4b || bytes[p+2] !== 0x02 || bytes[p+3] !== 0x01) break;
+      const method = bytes[p + 10] | (bytes[p + 11] << 8);
+      const compSize = bytes[p + 20] | (bytes[p + 21] << 8) | (bytes[p + 22] << 16) | (bytes[p + 23] << 24);
       const nameLen = bytes[p + 28] | (bytes[p + 29] << 8);
       const extraLen = bytes[p + 30] | (bytes[p + 31] << 8);
       const commLen = bytes[p + 32] | (bytes[p + 33] << 8);
@@ -849,13 +850,10 @@ Object.assign(app, {
         const lfhNameLen = bytes[localOff + 26] | (bytes[localOff + 27] << 8);
         const lfhExtraLen = bytes[localOff + 28] | (bytes[localOff + 29] << 8);
         const dataStart = localOff + 30 + lfhNameLen + lfhExtraLen;
-        const compSize = bytes[p - 20] | (bytes[p - 19] << 8) | (bytes[p - 18] << 16) | (bytes[p - 17] << 24);
-        const method = bytes[p - 12] | (bytes[p - 11] << 8);
         let data;
         if (method === 0) {
           data = bytes.slice(dataStart, dataStart + compSize);
         } else if (method === 8) {
-          // Inflate — use DecompressionStream if available
           const ds = new DecompressionStream('deflate-raw');
           const writer = ds.writable.getWriter();
           writer.write(bytes.slice(dataStart, dataStart + compSize));
