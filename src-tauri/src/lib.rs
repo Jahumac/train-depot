@@ -61,29 +61,53 @@ pub struct Subcategory {
 pub struct CatalogItem {
     pub id: String,
     pub name: String,
+    #[serde(default)]
     pub category_id: String,
+    #[serde(default)]
     pub subcategory_id: String,
+    #[serde(default)]
     pub manufacturer: String,
+    #[serde(default)]
     pub livery: String,
+    #[serde(default)]
     pub running_number: String,
+    #[serde(default)]
     pub product_code: String,
+    #[serde(default)]
     pub condition: String,
+    #[serde(default)]
     pub dcc_status: String,
+    #[serde(default)]
     pub purchase_price: f64,
+    #[serde(default)]
     pub current_value: f64,
+    #[serde(default)]
     pub place_of_purchase: String,
+    #[serde(default)]
     pub purchase_date: String,
+    #[serde(default)]
     pub storage_location: String,
+    #[serde(default)]
     pub last_service_date: String,
+    #[serde(default)]
     pub goes_well_with: String,
+    #[serde(default)]
     pub historical_background: String,
+    #[serde(default)]
     pub wishlist: bool,
+    #[serde(default)]
     pub wishlist_notes: String,
+    #[serde(default)]
     pub wishlist_spotted_at: String,
+    #[serde(default)]
     pub wishlist_spotted_price: f64,
+    #[serde(default)]
     pub tags: String, // comma-separated
+    #[serde(default)]
     pub images: Vec<String>,
+    #[serde(default)]
     pub created_at: String,
+    #[serde(default)]
     pub updated_at: String,
 }
 
