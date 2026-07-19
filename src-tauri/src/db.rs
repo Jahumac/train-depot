@@ -530,6 +530,33 @@ impl Database {
                             obj.insert(new, v);
                         }
                     }
+                    // Normalize tags: array → comma-separated string
+                    if let Some(tags_val) = obj.get("tags") {
+                        if tags_val.is_array() {
+                            let tags_str: String = tags_val.as_array().unwrap().iter()
+                                .filter_map(|v| v.as_str())
+                                .collect::<Vec<&str>>()
+                                .join(",");
+                            obj.insert("tags".to_string(), serde_json::Value::String(tags_str));
+                        }
+                    }
+                    // Normalize images: array of objects → array of filenames
+                    if let Some(images_val) = obj.get("images") {
+                        if images_val.is_array() {
+                            let filenames: Vec<serde_json::Value> = images_val.as_array().unwrap().iter()
+                                .filter_map(|v| {
+                                    if let Some(filename) = v.get("filename") {
+                                        Some(filename.clone())
+                                    } else if let Some(s) = v.as_str() {
+                                        Some(serde_json::Value::String(s.to_string()))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            obj.insert("images".to_string(), serde_json::Value::Array(filenames));
+                        }
+                    }
                 }
             }
         }
