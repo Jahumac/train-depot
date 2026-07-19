@@ -43,7 +43,10 @@ jobs:
       - run: npx tauri build --bundles dmg
       - name: Ad-hoc sign the app
         run: |
-          codesign --force --deep --sign - "src-tauri/target/release/bundle/dmg/Train Depot.app"
+          # Find the .app before it gets wrapped in DMG
+          APP=$(find src-tauri/target/release/bundle -name "*.app" -type d | head -1)
+          echo "Found app: $APP"
+          codesign --force --deep --sign - "$APP"
       - uses: actions/upload-artifact@v4
         with:
           name: train-depot-macos
