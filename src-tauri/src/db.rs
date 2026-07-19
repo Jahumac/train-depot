@@ -401,6 +401,15 @@ impl Database {
             )
             .map_err(|e| e.to_string())?;
 
+        let total_current_value: f64 = self
+            .conn
+            .query_row(
+                "SELECT COALESCE(SUM(current_value), 0) FROM items WHERE deleted_at IS NULL",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
         let locomotive_count: i64 = self
             .conn
             .query_row(
@@ -449,6 +458,7 @@ impl Database {
         Ok(CollectionStats {
             total_items,
             total_spent,
+            total_current_value,
             locomotive_count,
             rolling_stock_count,
             total_wishlist,

@@ -112,9 +112,11 @@ pub struct CatalogItem {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CollectionStats {
     pub total_items: i64,
     pub total_spent: f64,
+    pub total_current_value: f64,
     pub locomotive_count: i64,
     pub rolling_stock_count: i64,
     pub total_wishlist: i64,
