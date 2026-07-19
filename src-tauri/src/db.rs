@@ -503,8 +503,36 @@ impl Database {
     }
 
     pub fn import_json(&self, json_str: &str) -> Result<(), String> {
-        let data: serde_json::Value =
+        let mut data: serde_json::Value =
             serde_json::from_str(json_str).map_err(|e| format!("Invalid JSON: {}", e))?;
+
+        // Normalize camelCase → snake_case for Docker backup compatibility
+        if let Some(items) = data["items"].as_array_mut() {
+            for item_val in items.iter_mut() {
+                if let Some(obj) = item_val.as_object_mut() {
+                    let renames: Vec<(String, String)> = obj.keys()
+                        .filter(|k| k.chars().any(|c| c.is_uppercase()))
+                        .map(|k| {
+                            let snake = k.chars().fold(String::new(), |mut s, c| {
+                                if c.is_uppercase() {
+                                    s.push('_');
+                                    s.push(c.to_ascii_lowercase());
+                                } else {
+                                    s.push(c);
+                                }
+                                s
+                            });
+                            (k.clone(), snake)
+                        })
+                        .collect();
+                    for (old, new) in renames {
+                        if let Some(v) = obj.remove(&old) {
+                            obj.insert(new, v);
+                        }
+                    }
+                }
+            }
+        }
 
         // Import items
         if let Some(items) = data["items"].as_array() {
