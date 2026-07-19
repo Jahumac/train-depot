@@ -53,9 +53,10 @@ const DataAdapter = {
                 || window.__TAURI__?.core?.invoke;
     if (!invoke) throw new Error('Tauri bridge not available');
 
-    const [method, path] = this._parseEndpoint(endpoint);
-    const command = this._endpointToCommand(method, path);
-    const args = this._buildArgs(method, path, options);
+    const httpMethod = options.method || 'GET';
+    const [urlPath, search] = this._parseEndpoint(endpoint);
+    const command = this._endpointToCommand(httpMethod, urlPath);
+    const args = this._buildArgs(httpMethod, urlPath, options);
 
     try {
       return await invoke(command, args);
@@ -70,8 +71,9 @@ const DataAdapter = {
     const db = window.__CAPACITOR_SQLITE__;
     if (!db) throw new Error('Capacitor SQLite not available');
 
-    const [method, path] = this._parseEndpoint(endpoint);
-    return this._executeDbQuery(method, path, options);
+    const httpMethod = options.method || 'GET';
+    const [urlPath, search] = this._parseEndpoint(endpoint);
+    return this._executeDbQuery(httpMethod, urlPath, options);
   },
 
   // ── Helpers ─────────────────────────────────────────────────
