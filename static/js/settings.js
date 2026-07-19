@@ -251,11 +251,14 @@ Object.assign(app, {
     const file = event.target.files[0];
     if (!file) return;
 
-    // In Tauri mode, read file as base64 and pass to Rust
+    // In Tauri mode, use the file path from the HTML input
     if (window.__TAURI_INTERNALS__) {
+      // Tauri v2 webview exposes the real file path
+      const filePath = file.path || file.name;
+      const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'backup';
       const ok = await this.showConfirmModal({
         title: 'Restore full backup?',
-        message: `<strong>${this.esc(file.name)}</strong> will replace all catalogue data and overwrite any photos with matching filenames. This can\u2019t be undone \u2014 make sure you have a recent backup first.`,
+        message: `<strong>${this.esc(fileName)}</strong> will replace all catalogue data and overwrite any photos with matching filenames. This can\u2019t be undone \u2014 make sure you have a recent backup first.`,
         confirmText: 'Restore backup',
         confirmClass: 'btn-primary',
         icon: '\uD83D\uDCE6'
@@ -263,12 +266,7 @@ Object.assign(app, {
       if (!ok) { event.target.value = ''; return; }
       this.toast('Unpacking backup \u2014 this may take a moment\u2026');
       try {
-        const buf = await file.arrayBuffer();
-        const bytes = new Uint8Array(buf);
-        let binary = '';
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        const base64 = btoa(binary);
-        const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup', { zipBase64: base64 });
+        const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup', { zipPath: filePath });
         const photoCount = parseInt(result, 10) || 0;
         this.toast(`All aboard \u2014 restored with ${photoCount} photo${photoCount === 1 ? '' : 's'}!`);
         await this.loadCategories();
