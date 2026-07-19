@@ -48,15 +48,15 @@ const DataAdapter = {
 
   // ── Tauri mode (Desktop) ────────────────────────────────────
   async _tauriRequest(endpoint, options = {}) {
-    // Tauri invoke commands map REST endpoints to Rust functions
-    // e.g. GET /api/items → invoke('get_items')
-    //      POST /api/items → invoke('create_item', { body: ... })
-    const { invoke } = window.__TAURI__?.core || {};
+    // Tauri v2: invoke is on __TAURI_INTERNALS__, not __TAURI__
+    const invoke = window.__TAURI_INTERNALS__?.invoke
+                || window.__TAURI__?.core?.invoke;
     if (!invoke) throw new Error('Tauri bridge not available');
 
-    const [method, path] = this._parseEndpoint(endpoint);
-    const command = this._endpointToCommand(method, path);
-    const args = this._buildArgs(method, path, options);
+    const httpMethod = options.method || 'GET';
+    const [urlPath, search] = this._parseEndpoint(endpoint);
+    const command = this._endpointToCommand(httpMethod, urlPath);
+    const args = this._buildArgs(httpMethod, urlPath, options);
 
     try {
       return await invoke(command, args);
@@ -71,8 +71,9 @@ const DataAdapter = {
     const db = window.__CAPACITOR_SQLITE__;
     if (!db) throw new Error('Capacitor SQLite not available');
 
-    const [method, path] = this._parseEndpoint(endpoint);
-    return this._executeDbQuery(method, path, options);
+    const httpMethod = options.method || 'GET';
+    const [urlPath, search] = this._parseEndpoint(endpoint);
+    return this._executeDbQuery(httpMethod, urlPath, options);
   },
 
   // ── Helpers ─────────────────────────────────────────────────
@@ -158,7 +159,7 @@ const DataAdapter = {
 
 // Auto-detect mode from the environment
 (function detectMode() {
-  if (window.__TAURI__) {
+  if (window.__TAURI_INTERNALS__ || window.__TAURI__) {
     DataAdapter.init('tauri');
   } else if (window.__CAPACITOR__) {
     DataAdapter.init('capacitor');

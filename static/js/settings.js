@@ -250,15 +250,59 @@ Object.assign(app, {
   async importFullBackup(event) {
     const file = event.target.files[0];
     if (!file) return;
+
+    // In Tauri mode, read the file content in JS and pass to Rust
+    if (window.__TAURI_INTERNALS__) {
+      const ok = await this.showConfirmModal({
+        title: 'Restore full backup?',
+        message: `<strong>${this.esc(file.name)}</strong> will replace all catalogue data. This can\u2019t be undone \u2014 make sure you have a recent backup first.`,
+        confirmText: 'Restore backup',
+        confirmClass: 'btn-primary',
+        icon: '\uD83D\uDCE6'
+      });
+      if (!ok) { event.target.value = ''; return; }
+      this.toast('Restoring data \u2014 this may take a moment\u2026');
+      try {
+        const buf = await file.arrayBuffer();
+        const header = new Uint8Array(buf.slice(0, 4));
+        const isZip = header[0] === 0x50 && header[1] === 0x4b;
+        if (isZip) {
+          // It's a ZIP — extract data.json client-side
+          const zip = await this._extractJsonFromZip(buf);
+          if (zip) {
+            await window.__TAURI_INTERNALS__.invoke('import_data', { data: zip });
+          } else {
+            throw new Error('ZIP does not contain data.json');
+          }
+        } else {
+          // Plain JSON
+          const text = new TextDecoder().decode(new Uint8Array(buf));
+          await window.__TAURI_INTERNALS__.invoke('import_data', { data: text });
+        }
+        this.toast('All aboard \u2014 data restored successfully!');
+        await this.loadCategories();
+        await this.loadAllItems();
+        await this.loadStats();
+        this.showCatalog();
+      } catch (e) {
+        const msg = e && (e.message || String(e));
+        this.toast('Restore failed: ' + msg, 'error');
+      }
+      event.target.value = '';
+      return;
+    }
+
+    // Docker mode — use the HTML file input
     const ok = await this.showConfirmModal({
       title: 'Restore full backup?',
       message: `<strong>${this.esc(file.name)}</strong> will replace all catalogue data and overwrite any photos with matching filenames. This can\u2019t be undone \u2014 make sure you have a recent backup first.`,
       confirmText: 'Restore backup',
       confirmClass: 'btn-primary',
-      icon: '📦'
+      icon: '\uD83D\uDCE6'
     });
     if (!ok) { event.target.value = ''; return; }
 
+    // Docker mode — send ZIP to server
     const form = new FormData();
     form.append('file', file, file.name);
     this.toast('Unpacking backup \u2014 this may take a moment\u2026');
@@ -770,6 +814,58 @@ Object.assign(app, {
     printWindow.document.write(html);
     printWindow.document.close();
     this.toast('Insurance report opened — you can print or save it from there.');
+  },
+
+  // ── ZIP extraction helper (Tauri mode) ──────────────────────
+  async _extractJsonFromZip(buf) {
+    // Read the ZIP buffer and extract data.json
+    const bytes = new Uint8Array(buf);
+
+    // Find EOCD record
+    let eocd = -1;
+    for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65558); i--) {
+      if (bytes[i] === 0x50 && bytes[i+1] === 0x4b && bytes[i+2] === 0x05 && bytes[i+3] === 0x06) {
+        eocd = i; break;
+      }
+    }
+    if (eocd < 0) return null;
+
+    const cdOffset = bytes[eocd + 16] | (bytes[eocd + 17] << 8) | (bytes[eocd + 18] << 16) | (bytes[eocd + 19] << 24);
+    const totalEntries = bytes[eocd + 10] | (bytes[eocd + 11] << 8);
+
+    let p = cdOffset;
+    for (let e = 0; e < totalEntries; e++) {
+      if (bytes[p] !== 0x50 || bytes[p+1] !== 0x4b || bytes[p+2] !== 0x01 || bytes[p+3] !== 0x02) break;
+      const method = bytes[p + 10] | (bytes[p + 11] << 8);
+      const compSize = bytes[p + 20] | (bytes[p + 21] << 8) | (bytes[p + 22] << 16) | (bytes[p + 23] << 24);
+      const nameLen = bytes[p + 28] | (bytes[p + 29] << 8);
+      const extraLen = bytes[p + 30] | (bytes[p + 31] << 8);
+      const commLen = bytes[p + 32] | (bytes[p + 33] << 8);
+      const localOff = bytes[p + 42] | (bytes[p + 43] << 8) | (bytes[p + 44] << 16) | (bytes[p + 45] << 24);
+      const name = String.fromCharCode(...bytes.slice(p + 46, p + 46 + nameLen));
+      p += 46 + nameLen + extraLen + commLen;
+
+      if (name === 'data.json') {
+        // Read local file header
+        const lfhNameLen = bytes[localOff + 26] | (bytes[localOff + 27] << 8);
+        const lfhExtraLen = bytes[localOff + 28] | (bytes[localOff + 29] << 8);
+        const dataStart = localOff + 30 + lfhNameLen + lfhExtraLen;
+        let data;
+        if (method === 0) {
+          data = bytes.slice(dataStart, dataStart + compSize);
+        } else if (method === 8) {
+          const ds = new DecompressionStream('deflate-raw');
+          const writer = ds.writable.getWriter();
+          writer.write(bytes.slice(dataStart, dataStart + compSize));
+          writer.close();
+          data = new Uint8Array(await new Response(ds.readable).arrayBuffer());
+        } else {
+          return null;
+        }
+        return new TextDecoder().decode(data);
+      }
+    }
+    return null;
   },
 
 });

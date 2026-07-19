@@ -61,41 +61,73 @@ pub struct Subcategory {
 pub struct CatalogItem {
     pub id: String,
     pub name: String,
+    #[serde(default)]
     pub category_id: String,
+    #[serde(default)]
     pub subcategory_id: String,
+    #[serde(default)]
     pub manufacturer: String,
+    #[serde(default)]
     pub livery: String,
+    #[serde(default)]
     pub running_number: String,
+    #[serde(default)]
     pub product_code: String,
+    #[serde(default)]
     pub condition: String,
+    #[serde(default)]
     pub dcc_status: String,
+    #[serde(default)]
     pub purchase_price: f64,
+    #[serde(default)]
     pub current_value: f64,
+    #[serde(default)]
     pub place_of_purchase: String,
+    #[serde(default)]
     pub purchase_date: String,
+    #[serde(default)]
     pub storage_location: String,
+    #[serde(default)]
     pub last_service_date: String,
+    #[serde(default)]
     pub goes_well_with: String,
+    #[serde(default)]
     pub historical_background: String,
+    #[serde(default)]
     pub wishlist: bool,
+    #[serde(default)]
     pub wishlist_notes: String,
+    #[serde(default)]
     pub wishlist_spotted_at: String,
+    #[serde(default)]
     pub wishlist_spotted_price: f64,
+    #[serde(default)]
     pub tags: String, // comma-separated
+    #[serde(default)]
     pub images: Vec<String>,
+    #[serde(default)]
     pub created_at: String,
+    #[serde(default)]
     pub updated_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CollectionStats {
     pub total_items: i64,
     pub total_spent: f64,
+    pub total_current_value: f64,
     pub locomotive_count: i64,
     pub rolling_stock_count: i64,
     pub total_wishlist: i64,
     pub total_trash: i64,
     pub overdue_service: i64,
+    #[serde(default)]
+    pub wishlist_count: i64,
+    #[serde(default)]
+    pub by_subcategory: serde_json::Value,
+    #[serde(default)]
+    pub by_category: serde_json::Value,
 }
 
 // ── App state ───────────────────────────────────────────────────────────────
@@ -124,6 +156,11 @@ fn get_categories(state: State<AppState>) -> Result<Vec<Category>, String> {
 #[tauri::command]
 fn get_items(state: State<AppState>) -> Result<Vec<CatalogItem>, String> {
     state.db.lock().map_err(|e| e.to_string())?.get_items()
+}
+
+#[tauri::command]
+fn get_item(state: State<AppState>, id: String) -> Result<CatalogItem, String> {
+    state.db.lock().map_err(|e| e.to_string())?.get_item(&id)
 }
 
 #[tauri::command]
@@ -159,6 +196,12 @@ fn export_data(state: State<AppState>) -> Result<String, String> {
 #[tauri::command]
 fn import_data(state: State<AppState>, data: String) -> Result<(), String> {
     state.db.lock().map_err(|e| e.to_string())?.import_json(&data)
+}
+
+#[tauri::command]
+fn import_zip_backup(state: State<AppState>, zip_path: String) -> Result<String, String> {
+    let bytes = std::fs::read(&zip_path).map_err(|e| format!("Cannot read file: {}", e))?;
+    state.db.lock().map_err(|e| e.to_string())?.import_from_zip(&bytes)
 }
 
 #[tauri::command]
@@ -207,6 +250,7 @@ pub fn run() {
             update_settings,
             get_categories,
             get_items,
+            get_item,
             create_item,
             update_item,
             delete_item,
@@ -214,6 +258,7 @@ pub fn run() {
             get_tags,
             export_data,
             import_data,
+            import_zip_backup,
             auth_status,
             change_password,
             remove_password,

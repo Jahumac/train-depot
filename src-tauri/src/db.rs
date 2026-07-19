@@ -299,6 +299,52 @@ impl Database {
         Ok(items)
     }
 
+    pub fn get_item(&self, id: &str) -> Result<CatalogItem, String> {
+        self.conn.query_row(
+            "SELECT id, name, category_id, subcategory_id, manufacturer, livery,
+                    running_number, product_code, condition, dcc_status,
+                    purchase_price, current_value, place_of_purchase, purchase_date,
+                    storage_location, last_service_date, goes_well_with,
+                    historical_background, wishlist, wishlist_notes,
+                    wishlist_spotted_at, wishlist_spotted_price, tags, images,
+                    created_at, updated_at
+             FROM items WHERE id=?1 AND deleted_at IS NULL",
+            params![id],
+            |row| {
+                let images_str: String = row.get(23)?;
+                let images: Vec<String> = serde_json::from_str(&images_str).unwrap_or_default();
+                Ok(CatalogItem {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    category_id: row.get(2)?,
+                    subcategory_id: row.get(3)?,
+                    manufacturer: row.get(4)?,
+                    livery: row.get(5)?,
+                    running_number: row.get(6)?,
+                    product_code: row.get(7)?,
+                    condition: row.get(8)?,
+                    dcc_status: row.get(9)?,
+                    purchase_price: row.get(10)?,
+                    current_value: row.get(11)?,
+                    place_of_purchase: row.get(12)?,
+                    purchase_date: row.get(13)?,
+                    storage_location: row.get(14)?,
+                    last_service_date: row.get(15)?,
+                    goes_well_with: row.get(16)?,
+                    historical_background: row.get(17)?,
+                    wishlist: row.get::<_, i64>(18)? != 0,
+                    wishlist_notes: row.get(19)?,
+                    wishlist_spotted_at: row.get(20)?,
+                    wishlist_spotted_price: row.get(21)?,
+                    tags: row.get(22)?,
+                    images,
+                    created_at: row.get(24)?,
+                    updated_at: row.get(25)?,
+                })
+            },
+        ).map_err(|e| format!("Item not found: {}", e))
+    }
+
     pub fn create_item(&self, mut data: CatalogItem) -> Result<CatalogItem, String> {
         data.id = Uuid::new_v4().to_string();
         let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
@@ -401,6 +447,15 @@ impl Database {
             )
             .map_err(|e| e.to_string())?;
 
+        let total_current_value: f64 = self
+            .conn
+            .query_row(
+                "SELECT COALESCE(SUM(current_value), 0) FROM items WHERE deleted_at IS NULL",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
         let locomotive_count: i64 = self
             .conn
             .query_row(
@@ -446,14 +501,54 @@ impl Database {
             )
             .map_err(|e| e.to_string())?;
 
+        // Build bySubcategory and byCategory maps
+        let categories = self.get_categories()?;
+        let mut by_subcategory = serde_json::Map::new();
+        let mut by_category = serde_json::Map::new();
+
+        for cat in &categories {
+            let count: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM items WHERE category_id=?1 AND deleted_at IS NULL",
+                params![cat.id],
+                |row| row.get(0),
+            ).unwrap_or(0);
+            by_category.insert(cat.id.clone(), serde_json::json!({
+                "name": cat.name,
+                "count": count
+            }));
+
+            for sub in &cat.subcategories {
+                let sub_count: i64 = self.conn.query_row(
+                    "SELECT COUNT(*) FROM items WHERE subcategory_id=?1 AND deleted_at IS NULL",
+                    params![sub.id],
+                    |row| row.get(0),
+                ).unwrap_or(0);
+                by_subcategory.insert(sub.id.clone(), serde_json::json!({
+                    "name": sub.name,
+                    "parent": cat.id,
+                    "count": sub_count
+                }));
+            }
+        }
+
+        let wishlist_count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM items WHERE wishlist=1 AND deleted_at IS NULL",
+            [],
+            |row| row.get(0),
+        ).unwrap_or(0);
+
         Ok(CollectionStats {
             total_items,
             total_spent,
+            total_current_value,
             locomotive_count,
             rolling_stock_count,
             total_wishlist,
             total_trash,
             overdue_service,
+            wishlist_count,
+            by_subcategory: serde_json::Value::Object(by_subcategory),
+            by_category: serde_json::Value::Object(by_category),
         })
     }
 
@@ -503,8 +598,63 @@ impl Database {
     }
 
     pub fn import_json(&self, json_str: &str) -> Result<(), String> {
-        let data: serde_json::Value =
+        let mut data: serde_json::Value =
             serde_json::from_str(json_str).map_err(|e| format!("Invalid JSON: {}", e))?;
+
+        // Normalize camelCase → snake_case for Docker backup compatibility
+        if let Some(items) = data["items"].as_array_mut() {
+            for item_val in items.iter_mut() {
+                if let Some(obj) = item_val.as_object_mut() {
+                    let renames: Vec<(String, String)> = obj.keys()
+                        .filter(|k| k.chars().any(|c| c.is_uppercase()))
+                        .map(|k| {
+                            let snake = k.chars().fold(String::new(), |mut s, c| {
+                                if c.is_uppercase() {
+                                    s.push('_');
+                                    s.push(c.to_ascii_lowercase());
+                                } else {
+                                    s.push(c);
+                                }
+                                s
+                            });
+                            (k.clone(), snake)
+                        })
+                        .collect();
+                    for (old, new) in renames {
+                        if let Some(v) = obj.remove(&old) {
+                            obj.insert(new, v);
+                        }
+                    }
+                    // Normalize tags: array → comma-separated string
+                    if let Some(tags_val) = obj.get("tags") {
+                        if tags_val.is_array() {
+                            let tags_str: String = tags_val.as_array().unwrap().iter()
+                                .filter_map(|v| v.as_str())
+                                .collect::<Vec<&str>>()
+                                .join(",");
+                            obj.insert("tags".to_string(), serde_json::Value::String(tags_str));
+                        }
+                    }
+                    // Normalize images: array of objects → array of filenames
+                    if let Some(images_val) = obj.get("images") {
+                        if images_val.is_array() {
+                            let filenames: Vec<serde_json::Value> = images_val.as_array().unwrap().iter()
+                                .filter_map(|v| {
+                                    if let Some(filename) = v.get("filename") {
+                                        Some(filename.clone())
+                                    } else if let Some(s) = v.as_str() {
+                                        Some(serde_json::Value::String(s.to_string()))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            obj.insert("images".to_string(), serde_json::Value::Array(filenames));
+                        }
+                    }
+                }
+            }
+        }
 
         // Import items
         if let Some(items) = data["items"].as_array() {
@@ -638,6 +788,52 @@ impl Database {
             .map_err(|e| e.to_string())?;
 
         Ok(())
+    }
+
+    pub fn import_from_zip(&self, zip_bytes: &[u8]) -> Result<String, String> {
+        use std::io::Read;
+        use zip::read::ZipArchive;
+
+        let mut archive = ZipArchive::new(std::io::Cursor::new(zip_bytes))
+            .map_err(|e| format!("Invalid ZIP file: {}", e))?;
+
+        let mut data_json = None;
+        let mut photo_count = 0u32;
+
+        // Use the same platform-aware data directory as the database
+        let data_dir = std::env::var("TRAIN_DEPOT_DATA_DIR").unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+            #[cfg(target_os = "macos")]
+            { format!("{}/Library/Application Support/train-depot", home) }
+            #[cfg(target_os = "windows")]
+            { format!("{}/train-depot", std::env::var("APPDATA").unwrap_or_else(|_| ".".into())) }
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+            { format!("{}/.local/share/train-depot", home) }
+        });
+        let upload_dir = format!("{}/uploads", data_dir);
+        std::fs::create_dir_all(&upload_dir).map_err(|e| e.to_string())?;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let name = file.name().to_string();
+
+            if name == "data.json" {
+                let mut contents = String::new();
+                file.read_to_string(&mut contents).map_err(|e| e.to_string())?;
+                data_json = Some(contents);
+            } else if name.starts_with("uploads/") && !name.ends_with('/') {
+                let filename = name.trim_start_matches("uploads/");
+                let dest_path = format!("{}/{}", upload_dir, filename);
+                let mut out = std::fs::File::create(&dest_path).map_err(|e| e.to_string())?;
+                std::io::copy(&mut file, &mut out).map_err(|e| e.to_string())?;
+                photo_count += 1;
+            }
+        }
+
+        let json_str = data_json.ok_or("ZIP is missing data.json — not a Train Depot full backup")?;
+        self.import_json(&json_str)?;
+
+        Ok(format!("{}", photo_count))
     }
 }
 
