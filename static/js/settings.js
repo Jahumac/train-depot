@@ -255,10 +255,30 @@ Object.assign(app, {
       message: `<strong>${this.esc(file.name)}</strong> will replace all catalogue data and overwrite any photos with matching filenames. This can\u2019t be undone \u2014 make sure you have a recent backup first.`,
       confirmText: 'Restore backup',
       confirmClass: 'btn-primary',
-      icon: '📦'
+      icon: '\uD83D\uDCE6'
     });
     if (!ok) { event.target.value = ''; return; }
 
+    // In Tauri mode, use the file dialog and invoke the Rust command
+    if (window.__TAURI__) {
+      this.toast('Unpacking backup \u2014 this may take a moment\u2026');
+      try {
+        const { invoke } = window.__TAURI__.core;
+        const result = await invoke('import_zip_backup', { zipPath: file.path || file.name });
+        const photoCount = parseInt(result, 10) || 0;
+        this.toast(`All aboard \u2014 restored with ${photoCount} photo${photoCount === 1 ? '' : 's'}!`);
+        await this.loadCategories();
+        await this.loadAllItems();
+        await this.loadStats();
+        this.showCatalog();
+      } catch (e) {
+        this.toast('Restore failed: ' + e.message, 'error');
+      }
+      event.target.value = '';
+      return;
+    }
+
+    // Docker mode — send ZIP to server
     const form = new FormData();
     form.append('file', file, file.name);
     this.toast('Unpacking backup \u2014 this may take a moment\u2026');

@@ -639,6 +639,46 @@ impl Database {
 
         Ok(())
     }
+
+    pub fn import_from_zip(&self, zip_bytes: &[u8]) -> Result<String, String> {
+        use std::io::Read;
+        use zip::read::ZipArchive;
+
+        let mut archive = ZipArchive::new(std::io::Cursor::new(zip_bytes))
+            .map_err(|e| format!("Invalid ZIP file: {}", e))?;
+
+        let mut data_json = None;
+        let mut photo_count = 0u32;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let name = file.name().to_string();
+
+            if name == "data.json" {
+                let mut contents = String::new();
+                file.read_to_string(&mut contents).map_err(|e| e.to_string())?;
+                data_json = Some(contents);
+            } else if name.starts_with("uploads/") && !name.ends_with('/') {
+                // Save photo to the app's uploads directory
+                let upload_dir = format!(
+                    "{}/uploads",
+                    std::env::var("TRAIN_DEPOT_DATA_DIR")
+                        .unwrap_or_else(|_| format!("{}/.local/share/train-depot", std::env::var("HOME").unwrap_or_else(|_| ".".into())))
+                );
+                std::fs::create_dir_all(&upload_dir).map_err(|e| e.to_string())?;
+                let filename = name.trim_start_matches("uploads/");
+                let dest_path = format!("{}/{}", upload_dir, filename);
+                let mut out = std::fs::File::create(&dest_path).map_err(|e| e.to_string())?;
+                std::io::copy(&mut file, &mut out).map_err(|e| e.to_string())?;
+                photo_count += 1;
+            }
+        }
+
+        let json_str = data_json.ok_or("ZIP is missing data.json — not a Train Depot full backup")?;
+        self.import_json(&json_str)?;
+
+        Ok(format!("{}", photo_count))
+    }
 }
 
 // ── Password helpers ────────────────────────────────────────────────────────

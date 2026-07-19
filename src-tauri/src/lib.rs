@@ -162,6 +162,12 @@ fn import_data(state: State<AppState>, data: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn import_zip_backup(state: State<AppState>, zip_path: String) -> Result<String, String> {
+    let bytes = std::fs::read(&zip_path).map_err(|e| format!("Cannot read file: {}", e))?;
+    state.db.lock().map_err(|e| e.to_string())?.import_from_zip(&bytes)
+}
+
+#[tauri::command]
 fn auth_status(state: State<AppState>) -> Result<bool, String> {
     state.db.lock().map_err(|e| e.to_string())?.has_password()
 }
@@ -214,6 +220,7 @@ pub fn run() {
             get_tags,
             export_data,
             import_data,
+            import_zip_backup,
             auth_status,
             change_password,
             remove_password,
