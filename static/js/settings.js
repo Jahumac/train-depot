@@ -835,7 +835,7 @@ Object.assign(app, {
 
     let p = cdOffset;
     for (let e = 0; e < totalEntries; e++) {
-      if (bytes[p] !== 0x50 || bytes[p+1] !== 0x4b || bytes[p+2] !== 0x02 || bytes[p+3] !== 0x01) break;
+      if (bytes[p] !== 0x50 || bytes[p+1] !== 0x4b || bytes[p+2] !== 0x01 || bytes[p+3] !== 0x02) break;
       const method = bytes[p + 10] | (bytes[p + 11] << 8);
       const compSize = bytes[p + 20] | (bytes[p + 21] << 8) | (bytes[p + 22] << 16) | (bytes[p + 23] << 24);
       const nameLen = bytes[p + 28] | (bytes[p + 29] << 8);
