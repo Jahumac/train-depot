@@ -162,8 +162,11 @@ fn import_data(state: State<AppState>, data: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn import_zip_backup(state: State<AppState>, zip_path: String) -> Result<String, String> {
-    let bytes = std::fs::read(&zip_path).map_err(|e| format!("Cannot read file: {}", e))?;
+fn import_zip_backup(state: State<AppState>, zip_base64: String) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&zip_base64)
+        .map_err(|e| format!("Invalid base64 data: {}", e))?;
     state.db.lock().map_err(|e| e.to_string())?.import_from_zip(&bytes)
 }
 

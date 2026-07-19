@@ -251,19 +251,11 @@ Object.assign(app, {
     const file = event.target.files[0];
     if (!file) return;
 
-    // In Tauri mode, use the native file dialog to get the real path
-    if (window.__TAURI__) {
-      const { invoke } = window.__TAURI__.core;
-      const { open } = window.__TAURI__.dialog;
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: 'Backup', extensions: ['zip'] }]
-      });
-      if (!selected) { event.target.value = ''; return; }
-      const fileName = selected.split('/').pop() || selected.split('\\').pop() || 'backup';
+    // In Tauri mode, read file as base64 and pass to Rust
+    if (window.__TAURI_INTERNALS__) {
       const ok = await this.showConfirmModal({
         title: 'Restore full backup?',
-        message: `<strong>${this.esc(fileName)}</strong> will replace all catalogue data and overwrite any photos with matching filenames. This can\u2019t be undone \u2014 make sure you have a recent backup first.`,
+        message: `<strong>${this.esc(file.name)}</strong> will replace all catalogue data and overwrite any photos with matching filenames. This can\u2019t be undone \u2014 make sure you have a recent backup first.`,
         confirmText: 'Restore backup',
         confirmClass: 'btn-primary',
         icon: '\uD83D\uDCE6'
@@ -271,7 +263,12 @@ Object.assign(app, {
       if (!ok) { event.target.value = ''; return; }
       this.toast('Unpacking backup \u2014 this may take a moment\u2026');
       try {
-        const result = await invoke('import_zip_backup', { zipPath: selected });
+        const buf = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const base64 = btoa(binary);
+        const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup', { zipBase64: base64 });
         const photoCount = parseInt(result, 10) || 0;
         this.toast(`All aboard \u2014 restored with ${photoCount} photo${photoCount === 1 ? '' : 's'}!`);
         await this.loadCategories();
