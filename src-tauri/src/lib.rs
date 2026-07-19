@@ -58,6 +58,7 @@ pub struct Subcategory {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CatalogItem {
     pub id: String,
     pub name: String,
