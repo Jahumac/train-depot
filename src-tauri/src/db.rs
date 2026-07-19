@@ -601,30 +601,10 @@ impl Database {
         let mut data: serde_json::Value =
             serde_json::from_str(json_str).map_err(|e| format!("Invalid JSON: {}", e))?;
 
-        // Normalize camelCase → snake_case for Docker backup compatibility
+        // Normalize Docker backup format for compatibility
         if let Some(items) = data["items"].as_array_mut() {
             for item_val in items.iter_mut() {
                 if let Some(obj) = item_val.as_object_mut() {
-                    let renames: Vec<(String, String)> = obj.keys()
-                        .filter(|k| k.chars().any(|c| c.is_uppercase()))
-                        .map(|k| {
-                            let snake = k.chars().fold(String::new(), |mut s, c| {
-                                if c.is_uppercase() {
-                                    s.push('_');
-                                    s.push(c.to_ascii_lowercase());
-                                } else {
-                                    s.push(c);
-                                }
-                                s
-                            });
-                            (k.clone(), snake)
-                        })
-                        .collect();
-                    for (old, new) in renames {
-                        if let Some(v) = obj.remove(&old) {
-                            obj.insert(new, v);
-                        }
-                    }
                     // Normalize tags: array → comma-separated string
                     if let Some(tags_val) = obj.get("tags") {
                         if tags_val.is_array() {
@@ -642,8 +622,6 @@ impl Database {
                                 .filter_map(|v| {
                                     if let Some(filename) = v.get("filename") {
                                         Some(filename.clone())
-                                    } else if let Some(s) = v.as_str() {
-                                        Some(serde_json::Value::String(s.to_string()))
                                     } else {
                                         None
                                     }
