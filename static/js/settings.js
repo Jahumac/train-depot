@@ -263,11 +263,12 @@ Object.assign(app, {
       if (!ok) { event.target.value = ''; return; }
       this.toast('Restoring data \u2014 this may take a moment\u2026');
       try {
-        const text = await file.text();
-        // Try parsing as ZIP first (full backup), fall back to JSON
-        if (text.startsWith('PK')) {
+        const buf = await file.arrayBuffer();
+        const header = new Uint8Array(buf.slice(0, 4));
+        const isZip = header[0] === 0x50 && header[1] === 0x4b;
+        if (isZip) {
           // It's a ZIP — extract data.json client-side
-          const zip = await this._extractJsonFromZip(file);
+          const zip = await this._extractJsonFromZip(buf);
           if (zip) {
             await window.__TAURI_INTERNALS__.invoke('import_data', { data: zip });
           } else {
@@ -275,6 +276,7 @@ Object.assign(app, {
           }
         } else {
           // Plain JSON
+          const text = new TextDecoder().decode(new Uint8Array(buf));
           await window.__TAURI_INTERNALS__.invoke('import_data', { data: text });
         }
         this.toast('All aboard \u2014 data restored successfully!');
@@ -815,9 +817,8 @@ Object.assign(app, {
   },
 
   // ── ZIP extraction helper (Tauri mode) ──────────────────────
-  async _extractJsonFromZip(file) {
-    // Read the ZIP file and extract data.json
-    const buf = await file.arrayBuffer();
+  async _extractJsonFromZip(buf) {
+    // Read the ZIP buffer and extract data.json
     const bytes = new Uint8Array(buf);
     let pos = 0;
 
