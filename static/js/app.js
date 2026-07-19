@@ -545,21 +545,7 @@ const app = {
   // ==================== API Helpers ====================
 
   async api(endpoint, options = {}) {
-    try {
-      const res = await fetch(endpoint, options);
-      if (res.status === 401) {
-        window.location.href = '/login.html';
-        throw new Error('Session expired');
-      }
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
-      return res.json();
-    } catch (e) {
-      this.toast(e.message, 'error');
-      throw e;
-    }
+    return DataAdapter.request(endpoint, options);
   },
 
   async loadCategories() {
