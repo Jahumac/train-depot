@@ -299,6 +299,52 @@ impl Database {
         Ok(items)
     }
 
+    pub fn get_item(&self, id: &str) -> Result<CatalogItem, String> {
+        self.conn.query_row(
+            "SELECT id, name, category_id, subcategory_id, manufacturer, livery,
+                    running_number, product_code, condition, dcc_status,
+                    purchase_price, current_value, place_of_purchase, purchase_date,
+                    storage_location, last_service_date, goes_well_with,
+                    historical_background, wishlist, wishlist_notes,
+                    wishlist_spotted_at, wishlist_spotted_price, tags, images,
+                    created_at, updated_at
+             FROM items WHERE id=?1 AND deleted_at IS NULL",
+            params![id],
+            |row| {
+                let images_str: String = row.get(23)?;
+                let images: Vec<String> = serde_json::from_str(&images_str).unwrap_or_default();
+                Ok(CatalogItem {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    category_id: row.get(2)?,
+                    subcategory_id: row.get(3)?,
+                    manufacturer: row.get(4)?,
+                    livery: row.get(5)?,
+                    running_number: row.get(6)?,
+                    product_code: row.get(7)?,
+                    condition: row.get(8)?,
+                    dcc_status: row.get(9)?,
+                    purchase_price: row.get(10)?,
+                    current_value: row.get(11)?,
+                    place_of_purchase: row.get(12)?,
+                    purchase_date: row.get(13)?,
+                    storage_location: row.get(14)?,
+                    last_service_date: row.get(15)?,
+                    goes_well_with: row.get(16)?,
+                    historical_background: row.get(17)?,
+                    wishlist: row.get::<_, i64>(18)? != 0,
+                    wishlist_notes: row.get(19)?,
+                    wishlist_spotted_at: row.get(20)?,
+                    wishlist_spotted_price: row.get(21)?,
+                    tags: row.get(22)?,
+                    images,
+                    created_at: row.get(24)?,
+                    updated_at: row.get(25)?,
+                })
+            },
+        ).map_err(|e| format!("Item not found: {}", e))
+    }
+
     pub fn create_item(&self, mut data: CatalogItem) -> Result<CatalogItem, String> {
         data.id = Uuid::new_v4().to_string();
         let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();

@@ -159,6 +159,11 @@ fn get_items(state: State<AppState>) -> Result<Vec<CatalogItem>, String> {
 }
 
 #[tauri::command]
+fn get_item(state: State<AppState>, id: String) -> Result<CatalogItem, String> {
+    state.db.lock().map_err(|e| e.to_string())?.get_item(&id)
+}
+
+#[tauri::command]
 fn create_item(state: State<AppState>, data: CatalogItem) -> Result<CatalogItem, String> {
     state.db.lock().map_err(|e| e.to_string())?.create_item(data)
 }
@@ -245,6 +250,7 @@ pub fn run() {
             update_settings,
             get_categories,
             get_items,
+            get_item,
             create_item,
             update_item,
             delete_item,
