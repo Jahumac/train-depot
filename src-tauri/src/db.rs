@@ -650,6 +650,19 @@ impl Database {
         let mut data_json = None;
         let mut photo_count = 0u32;
 
+        // Use the same platform-aware data directory as the database
+        let data_dir = std::env::var("TRAIN_DEPOT_DATA_DIR").unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+            #[cfg(target_os = "macos")]
+            { format!("{}/Library/Application Support/train-depot", home) }
+            #[cfg(target_os = "windows")]
+            { format!("{}/train-depot", std::env::var("APPDATA").unwrap_or_else(|_| ".".into())) }
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+            { format!("{}/.local/share/train-depot", home) }
+        });
+        let upload_dir = format!("{}/uploads", data_dir);
+        std::fs::create_dir_all(&upload_dir).map_err(|e| e.to_string())?;
+
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
             let name = file.name().to_string();
@@ -659,13 +672,6 @@ impl Database {
                 file.read_to_string(&mut contents).map_err(|e| e.to_string())?;
                 data_json = Some(contents);
             } else if name.starts_with("uploads/") && !name.ends_with('/') {
-                // Save photo to the app's uploads directory
-                let upload_dir = format!(
-                    "{}/uploads",
-                    std::env::var("TRAIN_DEPOT_DATA_DIR")
-                        .unwrap_or_else(|_| format!("{}/.local/share/train-depot", std::env::var("HOME").unwrap_or_else(|_| ".".into())))
-                );
-                std::fs::create_dir_all(&upload_dir).map_err(|e| e.to_string())?;
                 let filename = name.trim_start_matches("uploads/");
                 let dest_path = format!("{}/{}", upload_dir, filename);
                 let mut out = std::fs::File::create(&dest_path).map_err(|e| e.to_string())?;

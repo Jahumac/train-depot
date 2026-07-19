@@ -250,21 +250,28 @@ Object.assign(app, {
   async importFullBackup(event) {
     const file = event.target.files[0];
     if (!file) return;
-    const ok = await this.showConfirmModal({
-      title: 'Restore full backup?',
-      message: `<strong>${this.esc(file.name)}</strong> will replace all catalogue data and overwrite any photos with matching filenames. This can\u2019t be undone \u2014 make sure you have a recent backup first.`,
-      confirmText: 'Restore backup',
-      confirmClass: 'btn-primary',
-      icon: '\uD83D\uDCE6'
-    });
-    if (!ok) { event.target.value = ''; return; }
 
-    // In Tauri mode, use the file dialog and invoke the Rust command
+    // In Tauri mode, use the native file dialog to get the real path
     if (window.__TAURI__) {
+      const { invoke } = window.__TAURI__.core;
+      const { open } = window.__TAURI__.dialog;
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: 'Backup', extensions: ['zip'] }]
+      });
+      if (!selected) { event.target.value = ''; return; }
+      const fileName = selected.split('/').pop() || selected.split('\\').pop() || 'backup';
+      const ok = await this.showConfirmModal({
+        title: 'Restore full backup?',
+        message: `<strong>${this.esc(fileName)}</strong> will replace all catalogue data and overwrite any photos with matching filenames. This can\u2019t be undone \u2014 make sure you have a recent backup first.`,
+        confirmText: 'Restore backup',
+        confirmClass: 'btn-primary',
+        icon: '\uD83D\uDCE6'
+      });
+      if (!ok) { event.target.value = ''; return; }
       this.toast('Unpacking backup \u2014 this may take a moment\u2026');
       try {
-        const { invoke } = window.__TAURI__.core;
-        const result = await invoke('import_zip_backup', { zipPath: file.path || file.name });
+        const result = await invoke('import_zip_backup', { zipPath: selected });
         const photoCount = parseInt(result, 10) || 0;
         this.toast(`All aboard \u2014 restored with ${photoCount} photo${photoCount === 1 ? '' : 's'}!`);
         await this.loadCategories();
@@ -277,6 +284,16 @@ Object.assign(app, {
       event.target.value = '';
       return;
     }
+
+    // Docker mode — use the HTML file input
+    const ok = await this.showConfirmModal({
+      title: 'Restore full backup?',
+      message: `<strong>${this.esc(file.name)}</strong> will replace all catalogue data and overwrite any photos with matching filenames. This can\u2019t be undone \u2014 make sure you have a recent backup first.`,
+      confirmText: 'Restore backup',
+      confirmClass: 'btn-primary',
+      icon: '\uD83D\uDCE6'
+    });
+    if (!ok) { event.target.value = ''; return; }
 
     // Docker mode — send ZIP to server
     const form = new FormData();
