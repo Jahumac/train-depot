@@ -311,7 +311,6 @@ pub fn run() {
                 )?;
             }
             app.handle().plugin(tauri_plugin_dialog::init())?;
-            app.handle().plugin(tauri_plugin_fs::init())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

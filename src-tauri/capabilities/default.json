@@ -8,17 +8,6 @@
   "permissions": [
     "core:default",
     "dialog:default",
-    "dialog:allow-open",
-    "fs:default",
-    "fs:allow-read",
-    "fs:allow-write",
-    {
-      "identifier": "fs:scope",
-      "allow": [
-        { "path": "$APPDATA/**" },
-        { "path": "$HOME/.local/share/train-depot/uploads/**" },
-        { "path": "$HOME/Library/Application Support/train-depot/uploads/**" }
-      ]
-    }
+    "dialog:allow-open"
   ]
 }

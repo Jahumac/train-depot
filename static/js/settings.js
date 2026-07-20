@@ -263,12 +263,11 @@ Object.assign(app, {
       if (!ok) { event.target.value = ''; return; }
       this.toast('Restoring data \u2014 this may take a moment\u2026');
       try {
-        // Use Tauri dialog plugin — scoped mode keeps original path (no copy)
+        // Use Tauri dialog plugin — default copy mode, no fs scope listener
         const selected = await window.__TAURI_INTERNALS__.invoke('plugin:dialog|open', {
           options: {
             filters: [{ name: 'Backup', extensions: ['zip', 'json'] }],
-            multiple: false,
-            fileAccessMode: 'scoped'
+            multiple: false
           }
         });
         if (!selected) { event.target.value = ''; return; }
