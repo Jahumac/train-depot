@@ -267,13 +267,15 @@ Object.assign(app, {
         const header = new Uint8Array(buf.slice(0, 4));
         const isZip = header[0] === 0x50 && header[1] === 0x4b;
         if (isZip) {
-          // It's a ZIP — extract data.json client-side
-          const zip = await this._extractJsonFromZip(buf);
-          if (zip) {
-            await window.__TAURI_INTERNALS__.invoke('import_data', { data: zip });
-          } else {
-            throw new Error('ZIP does not contain data.json');
-          }
+          // Write ZIP to temp file, then pass path to Rust
+          const tempDir = await window.__TAURI_INTERNALS__.invoke('get_upload_dir');
+          const tempPath = tempDir + '/_restore_' + file.name;
+          // Write via Rust command
+          await window.__TAURI_INTERNALS__.invoke('write_temp_file', { path: tempPath, data: Array.from(new Uint8Array(buf)) });
+          const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup', { zipPath: tempPath });
+          // Clean up
+          try { await window.__TAURI_INTERNALS__.invoke('delete_temp_file', { path: tempPath }); } catch {}
+          this.toast(`All aboard \u2014 restored with ${result} photo${result === '1' ? '' : 's'}!`);
         } else {
           // Plain JSON
           const text = new TextDecoder().decode(new Uint8Array(buf));

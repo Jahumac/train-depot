@@ -215,6 +215,24 @@ fn import_zip_backup(state: State<AppState>, zip_path: String) -> Result<String,
 }
 
 #[tauri::command]
+fn write_temp_file(path: String, data: Vec<u8>) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create dir: {}", e))?;
+    }
+    std::fs::write(&path, &data).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[tauri::command]
+fn delete_temp_file(path: String) -> Result<(), String> {
+    std::fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))
+}
+
+#[tauri::command]
+fn import_zip_backup_from_bytes(state: State<AppState>, data: Vec<u8>) -> Result<String, String> {
+    state.db.lock().map_err(|e| e.to_string())?.import_from_zip(&data)
+}
+
+#[tauri::command]
 fn auth_status(state: State<AppState>) -> Result<bool, String> {
     state.db.lock().map_err(|e| e.to_string())?.has_password()
 }
@@ -309,6 +327,9 @@ pub fn run() {
             export_data,
             import_data,
             import_zip_backup,
+            import_zip_backup_from_bytes,
+            write_temp_file,
+            delete_temp_file,
             auth_status,
             change_password,
             remove_password,
