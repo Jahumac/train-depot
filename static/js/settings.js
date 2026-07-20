@@ -331,13 +331,12 @@ Object.assign(app, {
         
         if (!dataJson) throw new Error('ZIP does not contain data.json');
         
-        console.log('Restore: found', photoEntries.length, 'photos in ZIP');
-        
         // Import catalogue data
         await window.__TAURI_INTERNALS__.invoke('import_data', { data: dataJson });
         
         // Save photos one at a time
         let photoCount = 0;
+        let failCount = 0;
         for (const photo of photoEntries) {
           try {
             await window.__TAURI_INTERNALS__.invoke('save_upload_file', { 
@@ -345,14 +344,15 @@ Object.assign(app, {
               data: Array.from(photo.data) 
             });
             photoCount++;
-            if (photoCount % 50 === 0) {
-              console.log('Restore: saved', photoCount, 'of', photoEntries.length, 'photos');
-            }
           } catch (e) {
-            console.warn('Failed to save photo:', photo.filename, e);
+            failCount++;
           }
         }
-        console.log('Restore: saved', photoCount, 'photos total');
+        
+        // Show detailed result
+        const msg = 'Found ' + photoEntries.length + ' photos, saved ' + photoCount + ', failed ' + failCount;
+        console.log(msg);
+        this.toast(msg);
         
         this.toast('All aboard \u2014 restored with ' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + '!');
         await this.loadCategories();
