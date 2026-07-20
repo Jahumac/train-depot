@@ -1513,14 +1513,14 @@ body.drawer-open { overflow: hidden; }
 [data-theme="dark"] select,
 [data-theme="dark"] input,
 [data-theme="dark"] .sort-select {
-  background: var(--color-bg-card);
-  color: var(--color-text);
-  border-color: var(--color-border);
+  background: var(--color-bg-card) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
 }
 
 [data-theme="dark"] select:focus,
 [data-theme="dark"] input:focus {
-  border-color: var(--color-primary-light);
+  border-color: var(--color-primary-light) !important;
 }
 
 .form-error {
