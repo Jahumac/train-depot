@@ -229,26 +229,6 @@ fn delete_temp_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn pick_and_restore_backup(state: State<AppState>, app_handle: tauri::AppHandle) -> Result<String, String> {
-    use tauri_plugin_dialog::DialogExt;
-    // Non-blocking dialog with channel — command thread waits, main thread doesn't
-    let (tx, rx) = std::sync::mpsc::channel();
-    app_handle.dialog()
-        .file()
-        .add_filter("Backup", &["zip", "json"])
-        .pick_file(move |file_path| {
-            let _ = tx.send(file_path);
-        });
-    
-    let file_path = rx.recv().unwrap_or(None)
-        .ok_or("No file selected".to_string())?;
-    
-    let path_str = file_path.to_string();
-    let bytes = std::fs::read(&path_str).map_err(|e| format!("Cannot read file: {}", e))?;
-    state.db.lock().map_err(|e| e.to_string())?.import_from_zip(&bytes)
-}
-
-#[tauri::command]
 fn import_zip_backup_from_bytes(state: State<AppState>, data: Vec<u8>) -> Result<String, String> {
     state.db.lock().map_err(|e| e.to_string())?.import_from_zip(&data)
 }
@@ -357,7 +337,6 @@ pub fn run() {
             health_check,
             get_upload_dir,
             read_upload_file,
-            pick_and_restore_backup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -251,7 +251,7 @@ Object.assign(app, {
     const file = event.target.files[0];
     if (!file) return;
 
-    // In Tauri mode, use native dialog — all in Rust
+    // In Tauri mode, read file in JS and pass binary through IPC
     if (window.__TAURI_INTERNALS__) {
       const ok = await this.showConfirmModal({
         title: 'Restore full backup?',
@@ -263,7 +263,9 @@ Object.assign(app, {
       if (!ok) { event.target.value = ''; return; }
       this.toast('Restoring data \u2014 this may take a moment\u2026');
       try {
-        const result = await window.__TAURI_INTERNALS__.invoke('pick_and_restore_backup');
+        const buf = await file.arrayBuffer();
+        // Pass Uint8Array directly — Tauri v2 IPC handles binary natively
+        const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup_from_bytes', { data: new Uint8Array(buf) });
         this.toast('All aboard \u2014 restored with ' + result + ' photo' + (result === '1' ? '' : 's') + '!');
         await this.loadCategories();
         await this.loadAllItems();
