@@ -263,8 +263,13 @@ Object.assign(app, {
       if (!ok) { event.target.value = ''; return; }
       this.toast('Restoring data \u2014 this may take a moment\u2026');
       try {
-        // Use the file path from the HTML input (Tauri v2 exposes file.path)
-        const filePath = file.path || file.name;
+        // Use Tauri dialog to get the real file path
+        const selected = await window.__TAURI_INTERNALS__.invoke('plugin:dialog|open', {
+          filters: [{ name: 'Backup', extensions: ['zip', 'json'] }],
+          multiple: false
+        });
+        if (!selected) { event.target.value = ''; return; }
+        const filePath = typeof selected === 'string' ? selected : selected.path || selected;
         const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup', { zipPath: filePath });
         this.toast('All aboard \u2014 restored with ' + result + ' photo' + (result === '1' ? '' : 's') + '!');
         await this.loadCategories();
