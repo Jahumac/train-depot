@@ -102,14 +102,23 @@ pub struct CatalogItem {
     pub wishlist_spotted_at: String,
     #[serde(default)]
     pub wishlist_spotted_price: f64,
-    #[serde(default)]
-    pub tags: String, // comma-separated
+    #[serde(default, serialize_with = "serialize_tags")]
+    pub tags: String, // comma-separated internally, serialized as array
     #[serde(default)]
     pub images: Vec<String>,
     #[serde(default)]
     pub created_at: String,
     #[serde(default)]
     pub updated_at: String,
+}
+
+// Custom serializer: split comma-separated tags into an array for the frontend
+fn serialize_tags<S>(tags: &str, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let arr: Vec<&str> = tags.split(',').map(|t| t.trim()).filter(|t| !t.is_empty()).collect();
+    arr.serialize(serializer)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
