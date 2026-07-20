@@ -81,15 +81,16 @@ const DataAdapter = {
     if (!invoke) return items;
     try {
       const uploadDir = await invoke('get_upload_dir');
-      // Tauri v2: use asset protocol directly
-      // asset://localhost/<path> is the standard Tauri v2 asset URL
+      // Tauri v2: use convertFileSrc from __TAURI_INTERNALS__
+      const convertFileSrc = window.__TAURI_INTERNALS__?.convertFileSrc
+                          || ((p) => `https://tauri.localhost/${encodeURI(p)}`);
       for (const item of items) {
         if (item.images && item.images.length > 0) {
           item.images = item.images.map(fn => {
             if (fn.startsWith('http://') || fn.startsWith('https://') || fn.startsWith('asset://')) {
               return fn;
             }
-            return `asset://localhost/${encodeURI(`${uploadDir}/${fn}`)}`;
+            return convertFileSrc(`${uploadDir}/${fn}`);
           });
         }
       }
