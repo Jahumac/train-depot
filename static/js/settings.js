@@ -251,7 +251,7 @@ Object.assign(app, {
     const file = event.target.files[0];
     if (!file) return;
 
-    // In Tauri mode, use the file path directly — no IPC size limit
+    // In Tauri mode, read the file in JS and pass to Rust
     if (window.__TAURI_INTERNALS__) {
       const ok = await this.showConfirmModal({
         title: 'Restore full backup?',
@@ -263,10 +263,9 @@ Object.assign(app, {
       if (!ok) { event.target.value = ''; return; }
       this.toast('Restoring data \u2014 this may take a moment\u2026');
       try {
-        // Tauri v2 exposes the real filesystem path on file.path
-        const filePath = file.path;
-        if (!filePath) throw new Error('Could not get file path');
-        const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup', { zipPath: filePath });
+        const buf = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup_from_bytes', { data: Array.from(bytes) });
         this.toast('All aboard \u2014 restored with ' + result + ' photo' + (result === '1' ? '' : 's') + '!');
         await this.loadCategories();
         await this.loadAllItems();
