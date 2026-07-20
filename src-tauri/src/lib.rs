@@ -245,6 +245,35 @@ fn get_upload_dir() -> String {
     { format!("{}/.local/share/train-depot/uploads", home) }
 }
 
+#[tauri::command]
+fn read_upload_file(filename: String) -> Result<String, String> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    #[cfg(target_os = "macos")]
+    let upload_dir = format!("{}/Library/Application Support/train-depot/uploads", home);
+    #[cfg(target_os = "windows")]
+    let upload_dir = format!("{}/train-depot/uploads", std::env::var("APPDATA").unwrap_or_else(|_| ".".into()));
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let upload_dir = format!("{}/.local/share/train-depot/uploads", home);
+
+    let path = std::path::Path::new(&upload_dir).join(&filename);
+    let data = std::fs::read(&path).map_err(|e| format!("Cannot read file: {}", e))?;
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&data);
+    // Detect MIME type from extension
+    let ext = std::path::Path::new(&filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("jpg")
+        .to_lowercase();
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        _ => "image/jpeg",
+    };
+    Ok(format!("data:{};base64,{}", mime, b64))
+}
+
 // ── App entry point ─────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -285,6 +314,7 @@ pub fn run() {
             remove_password,
             health_check,
             get_upload_dir,
+            read_upload_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

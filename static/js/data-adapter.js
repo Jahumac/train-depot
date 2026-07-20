@@ -80,22 +80,24 @@ const DataAdapter = {
                 || window.__TAURI__?.core?.invoke;
     if (!invoke) return items;
     try {
-      const uploadDir = await invoke('get_upload_dir');
-      // Tauri v2: use convertFileSrc from __TAURI_INTERNALS__
-      const convertFileSrc = window.__TAURI_INTERNALS__?.convertFileSrc
-                          || ((p) => `https://tauri.localhost/${encodeURI(p)}`);
       for (const item of items) {
         if (item.images && item.images.length > 0) {
-          item.images = item.images.map(fn => {
-            if (fn.startsWith('http://') || fn.startsWith('https://') || fn.startsWith('asset://')) {
+          // Load each image via read_upload_file command
+          const resolved = await Promise.all(item.images.map(async (fn) => {
+            if (fn.startsWith('http://') || fn.startsWith('https://') || fn.startsWith('data:')) {
               return fn;
             }
-            return convertFileSrc(`${uploadDir}/${fn}`);
-          });
+            try {
+              return await invoke('read_upload_file', { filename: fn });
+            } catch {
+              return fn; // fallback to filename if read fails
+            }
+          }));
+          item.images = resolved;
         }
       }
     } catch (e) {
-      // If upload dir fails, leave images as-is
+      // If anything fails, leave images as-is
     }
     return items;
   },
