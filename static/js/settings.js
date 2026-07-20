@@ -251,7 +251,7 @@ Object.assign(app, {
     const file = event.target.files[0];
     if (!file) return;
 
-    // In Tauri mode, read the file content in JS and pass to Rust
+    // In Tauri mode, use the file path directly — no IPC size limit
     if (window.__TAURI_INTERNALS__) {
       const ok = await this.showConfirmModal({
         title: 'Restore full backup?',
@@ -263,25 +263,10 @@ Object.assign(app, {
       if (!ok) { event.target.value = ''; return; }
       this.toast('Restoring data \u2014 this may take a moment\u2026');
       try {
-        const buf = await file.arrayBuffer();
-        const header = new Uint8Array(buf.slice(0, 4));
-        const isZip = header[0] === 0x50 && header[1] === 0x4b;
-        if (isZip) {
-          // Write ZIP to temp file, then pass path to Rust
-          const tempDir = await window.__TAURI_INTERNALS__.invoke('get_upload_dir');
-          const tempPath = tempDir + '/_restore_' + file.name;
-          // Write via Rust command
-          await window.__TAURI_INTERNALS__.invoke('write_temp_file', { path: tempPath, data: Array.from(new Uint8Array(buf)) });
-          const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup', { zipPath: tempPath });
-          // Clean up
-          try { await window.__TAURI_INTERNALS__.invoke('delete_temp_file', { path: tempPath }); } catch {}
-          this.toast(`All aboard \u2014 restored with ${result} photo${result === '1' ? '' : 's'}!`);
-        } else {
-          // Plain JSON
-          const text = new TextDecoder().decode(new Uint8Array(buf));
-          await window.__TAURI_INTERNALS__.invoke('import_data', { data: text });
-        }
-        this.toast('All aboard \u2014 data restored successfully!');
+        // Use the file path from the HTML input (Tauri v2 exposes file.path)
+        const filePath = file.path || file.name;
+        const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup', { zipPath: filePath });
+        this.toast('All aboard \u2014 restored with ' + result + ' photo' + (result === '1' ? '' : 's') + '!');
         await this.loadCategories();
         await this.loadAllItems();
         await this.loadStats();
