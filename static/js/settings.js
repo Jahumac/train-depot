@@ -251,7 +251,7 @@ Object.assign(app, {
     const file = event.target.files[0];
     if (!file) return;
 
-    // In Tauri mode, use dialog plugin via invoke to get file path, then pass to Rust
+    // In Tauri mode, extract data.json and photos from ZIP client-side
     if (window.__TAURI_INTERNALS__) {
       const ok = await this.showConfirmModal({
         title: 'Restore full backup?',
@@ -261,21 +261,96 @@ Object.assign(app, {
         icon: '\uD83D\uDCE6'
       });
       if (!ok) { event.target.value = ''; return; }
-      this.toast('Restoring data \u2014 this may take a moment\u2026');
+      this.toast('Restoring data \u2014 extracting backup\u2026');
       try {
-        // Use Tauri dialog plugin — default copy mode, no fs scope listener
-        const selected = await window.__TAURI_INTERNALS__.invoke('plugin:dialog|open', {
-          options: {
-            filters: [{ name: 'Backup', extensions: ['zip', 'json'] }],
-            multiple: false
+        const buf = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        
+        // Parse ZIP central directory to find entries
+        let dataJson = null;
+        const photoEntries = [];
+        
+        // Find End of Central Directory record
+        let eocd = -1;
+        for (let i = bytes.length - 22; i >= 0 && i >= bytes.length - 65557; i--) {
+          if (bytes[i] === 0x50 && bytes[i+1] === 0x4b && bytes[i+2] === 0x05 && bytes[i+3] === 0x06) {
+            eocd = i; break;
           }
-        });
-        if (!selected) { event.target.value = ''; return; }
-        // selected is a string path or { path: string }
-        const filePath = typeof selected === 'string' ? selected : (selected.path || selected);
-        if (!filePath || typeof filePath !== 'string') throw new Error('No file path returned');
-        const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup', { zipPath: filePath });
-        this.toast('All aboard \u2014 restored with ' + result + ' photo' + (result === '1' ? '' : 's') + '!');
+        }
+        if (eocd < 0) throw new Error('Invalid ZIP file');
+        
+        const cdOffset = new DataView(buf.buffer, eocd + 16, 4).getUint32(0, true);
+        const cdSize = new DataView(buf.buffer, eocd + 12, 4).getUint32(0, true);
+        const numEntries = new DataView(buf.buffer, eocd + 10, 2).getUint16(0, true);
+        
+        let pos = cdOffset;
+        for (let i = 0; i < numEntries; i++) {
+          if (new DataView(buf.buffer, pos, 4).getUint32(0, true) !== 0x02014b50) break;
+          const compMethod = new DataView(buf.buffer, pos + 10, 2).getUint16(0, true);
+          const compSize = new DataView(buf.buffer, pos + 20, 4).getUint32(0, true);
+          const uncompSize = new DataView(buf.buffer, pos + 24, 4).getUint32(0, true);
+          const nameLen = new DataView(buf.buffer, pos + 28, 2).getUint16(0, true);
+          const extraLen = new DataView(buf.buffer, pos + 30, 2).getUint16(0, true);
+          const commentLen = new DataView(buf.buffer, pos + 32, 2).getUint16(0, true);
+          const localHeaderOffset = new DataView(buf.buffer, pos + 42, 4).getUint32(0, true);
+          const name = new TextDecoder().decode(bytes.slice(pos + 46, pos + 46 + nameLen));
+          
+          // Get data offset from local file header
+          const localNameLen = new DataView(buf.buffer, localHeaderOffset + 26, 2).getUint16(0, true);
+          const localExtraLen = new DataView(buf.buffer, localHeaderOffset + 28, 2).getUint16(0, true);
+          const dataOffset = localHeaderOffset + 30 + localNameLen + localExtraLen;
+          const compressedData = bytes.slice(dataOffset, dataOffset + compSize);
+          
+          if (name === 'data.json') {
+            if (compMethod === 0) {
+              dataJson = new TextDecoder().decode(compressedData);
+            } else if (compMethod === 8) {
+              // DEFLATE
+              const ds = new DecompressionStream('deflate-raw');
+              const blob = new Blob([compressedData]);
+              const decompressed = await blob.stream().pipeThrough(ds).getReader().read();
+              const fullDecompressed = await new Response(new Blob([decompressed.value])).text();
+              dataJson = fullDecompressed;
+            }
+          } else if (name.startsWith('uploads/') && !name.endsWith('/')) {
+            const filename = name.replace('uploads/', '');
+            let photoData = null;
+            if (compMethod === 0) {
+              photoData = compressedData;
+            } else if (compMethod === 8) {
+              const ds = new DecompressionStream('deflate-raw');
+              const blob = new Blob([compressedData]);
+              const decompressed = await blob.stream().pipeThrough(ds).getReader().read();
+              photoData = decompressed.value;
+            }
+            if (photoData) {
+              photoEntries.push({ filename, data: photoData });
+            }
+          }
+          
+          pos += 46 + nameLen + extraLen + commentLen;
+        }
+        
+        if (!dataJson) throw new Error('ZIP does not contain data.json');
+        
+        // Import catalogue data
+        await window.__TAURI_INTERNALS__.invoke('import_data', { data: dataJson });
+        
+        // Save photos one at a time
+        let photoCount = 0;
+        for (const photo of photoEntries) {
+          try {
+            await window.__TAURI_INTERNALS__.invoke('save_upload_file', { 
+              filename: photo.filename, 
+              data: Array.from(photo.data) 
+            });
+            photoCount++;
+          } catch (e) {
+            console.warn('Failed to save photo:', photo.filename, e);
+          }
+        }
+        
+        this.toast('All aboard \u2014 restored with ' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + '!');
         await this.loadCategories();
         await this.loadAllItems();
         await this.loadStats();

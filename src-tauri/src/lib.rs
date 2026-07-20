@@ -293,6 +293,21 @@ fn read_upload_file(filename: String) -> Result<String, String> {
     Ok(format!("data:{};base64,{}", mime, b64))
 }
 
+#[tauri::command]
+fn save_upload_file(filename: String, data: Vec<u8>) -> Result<(), String> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    #[cfg(target_os = "macos")]
+    let upload_dir = format!("{}/Library/Application Support/train-depot/uploads", home);
+    #[cfg(target_os = "windows")]
+    let upload_dir = format!("{}/train-depot/uploads", std::env::var("APPDATA").unwrap_or_else(|_| ".".into()));
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let upload_dir = format!("{}/.local/share/train-depot/uploads", home);
+
+    std::fs::create_dir_all(&upload_dir).map_err(|e| format!("Cannot create upload dir: {}", e))?;
+    let path = std::path::Path::new(&upload_dir).join(&filename);
+    std::fs::write(&path, &data).map_err(|e| format!("Cannot write file: {}", e))
+}
+
 // ── App entry point ─────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -336,6 +351,7 @@ pub fn run() {
             health_check,
             get_upload_dir,
             read_upload_file,
+            save_upload_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
