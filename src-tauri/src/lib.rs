@@ -234,6 +234,17 @@ fn health_check() -> String {
     "{\"status\":\"ok\",\"version\":\"1.4.0\"}".into()
 }
 
+#[tauri::command]
+fn get_upload_dir() -> String {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    #[cfg(target_os = "macos")]
+    { format!("{}/Library/Application Support/train-depot/uploads", home) }
+    #[cfg(target_os = "windows")]
+    { format!("{}/train-depot/uploads", std::env::var("APPDATA").unwrap_or_else(|_| ".".into())) }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    { format!("{}/.local/share/train-depot/uploads", home) }
+}
+
 // ── App entry point ─────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -273,6 +284,7 @@ pub fn run() {
             change_password,
             remove_password,
             health_check,
+            get_upload_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

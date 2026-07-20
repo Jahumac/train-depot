@@ -59,10 +59,43 @@ const DataAdapter = {
     const args = this._buildArgs(httpMethod, urlPath, options);
 
     try {
-      return await invoke(command, args);
+      const result = await invoke(command, args);
+      // Resolve image filenames to local file URLs for items responses
+      if (Array.isArray(result) && result.length > 0 && result[0].images) {
+        return this._resolveImageUrls(result);
+      }
+      if (result && result.images) {
+        return this._resolveImageUrls([result])[0];
+      }
+      return result;
     } catch (e) {
       throw new Error(typeof e === 'string' ? e : e.message || 'Request failed');
     }
+  },
+
+  // Resolve image filenames to local file URLs in Tauri mode
+  async _resolveImageUrls(items) {
+    const invoke = window.__TAURI_INTERNALS__?.invoke
+                || window.__TAURI__?.core?.invoke;
+    if (!invoke) return items;
+    try {
+      const uploadDir = await invoke('get_upload_dir');
+      const convertFileSrc = window.__TAURI__?.tauri?.convertFileSrc
+                          || ((p) => `asset://localhost/${encodeURI(p)}`);
+      for (const item of items) {
+        if (item.images && item.images.length > 0) {
+          item.images = item.images.map(fn => {
+            if (fn.startsWith('http://') || fn.startsWith('https://') || fn.startsWith('asset://')) {
+              return fn;
+            }
+            return convertFileSrc(`${uploadDir}/${fn}`);
+          });
+        }
+      }
+    } catch (e) {
+      // If upload dir fails, leave images as-is
+    }
+    return items;
   },
 
   // ── Capacitor mode (Mobile) ─────────────────────────────────

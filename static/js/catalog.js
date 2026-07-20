@@ -540,6 +540,16 @@ Object.assign(app, {
   getFilteredItems() {
     let items = this.sortItems(this.items);
     const f = this.advancedFilters;
+    // Apply server-side filter params client-side (Rust backend doesn't filter)
+    if (this.currentFilter) {
+      if (this.currentFilter.type === 'category') {
+        items = items.filter(i => i.categoryId === this.currentFilter.value);
+      } else if (this.currentFilter.type === 'subcategory') {
+        items = items.filter(i => i.subcategoryId === this.currentFilter.value);
+      } else if (this.currentFilter.type === 'tag') {
+        items = items.filter(i => i.tags && i.tags.includes(this.currentFilter.value));
+      }
+    }
     if (f.manufacturer) items = items.filter(i => i.manufacturer === f.manufacturer);
     if (f.condition) items = items.filter(i => i.condition === f.condition);
     if (f.dccStatus) items = items.filter(i => i.dccStatus === f.dccStatus);
