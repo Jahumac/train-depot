@@ -351,8 +351,27 @@ Object.assign(app, {
         
         // Show detailed result
         const msg = 'Found ' + photoEntries.length + ' photos, saved ' + photoCount + ', failed ' + failCount;
-        console.log(msg);
         this.toast(msg);
+        
+        // Debug: check what's on disk
+        try {
+          const diskInfo = await window.__TAURI_INTERNALS__.invoke('count_upload_files');
+          console.log('Disk:', diskInfo);
+          this.toast(diskInfo, 'info');
+        } catch(e) {
+          console.log('count_upload_files failed:', e);
+        }
+        
+        // Debug: try reading first photo
+        if (photoEntries.length > 0) {
+          try {
+            const dataUrl = await window.__TAURI_INTERNALS__.invoke('read_upload_file', { filename: photoEntries[0].filename });
+            console.log('First photo read OK, length:', dataUrl.length);
+          } catch(e) {
+            console.log('read_upload_file failed:', e);
+            this.toast('read_upload_file error: ' + (e.message || String(e)), 'error');
+          }
+        }
         
         this.toast('All aboard \u2014 restored with ' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + '!');
         await this.loadCategories();

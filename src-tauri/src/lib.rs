@@ -308,6 +308,31 @@ fn save_upload_file(filename: String, data: Vec<u8>) -> Result<(), String> {
     std::fs::write(&path, &data).map_err(|e| format!("Cannot write file: {}", e))
 }
 
+#[tauri::command]
+fn count_upload_files() -> Result<String, String> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    #[cfg(target_os = "macos")]
+    let upload_dir = format!("{}/Library/Application Support/train-depot/uploads", home);
+    #[cfg(target_os = "windows")]
+    let upload_dir = format!("{}/train-depot/uploads", std::env::var("APPDATA").unwrap_or_else(|_| ".".into()));
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let upload_dir = format!("{}/.local/share/train-depot/uploads", home);
+
+    let path = std::path::Path::new(&upload_dir);
+    if !path.exists() {
+        return Ok(format!("Upload dir does not exist: {}", upload_dir));
+    }
+    let entries = std::fs::read_dir(&path).map_err(|e| format!("Cannot read dir: {}", e))?;
+    let files: Vec<String> = entries.filter_map(|e| {
+        e.ok().and_then(|entry| {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let size = entry.metadata().ok().map(|m| m.len()).unwrap_or(0);
+            Some(format!("{} ({}b)", name, size))
+        })
+    }).collect();
+    Ok(format!("Dir: {} | {} files: {}", upload_dir, files.len(), files.iter().take(5).cloned().collect::<Vec<_>>().join(", ")))
+}
+
 // ── App entry point ─────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -352,6 +377,7 @@ pub fn run() {
             get_upload_dir,
             read_upload_file,
             save_upload_file,
+            count_upload_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
