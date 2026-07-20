@@ -231,7 +231,7 @@ fn remove_password(state: State<AppState>, current: String) -> Result<(), String
 
 #[tauri::command]
 fn health_check() -> String {
-    "{\"status\":\"ok\",\"version\":\"1.4.0\"}".into()
+    "{\"status\":\"ok\",\"version\":\"1.4.1\"}".into()
 }
 
 #[tauri::command]

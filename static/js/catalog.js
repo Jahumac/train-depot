@@ -548,6 +548,19 @@ Object.assign(app, {
         items = items.filter(i => i.subcategoryId === this.currentFilter.value);
       } else if (this.currentFilter.type === 'tag') {
         items = items.filter(i => i.tags && i.tags.includes(this.currentFilter.value));
+      } else if (this.currentFilter.type === 'search') {
+        const q = this.currentFilter.value.toLowerCase();
+        items = items.filter(i =>
+          (i.name && i.name.toLowerCase().includes(q)) ||
+          (i.manufacturer && i.manufacturer.toLowerCase().includes(q)) ||
+          (i.livery && i.livery.toLowerCase().includes(q)) ||
+          (i.runningNumber && i.runningNumber.toLowerCase().includes(q)) ||
+          (i.productCode && i.productCode.toLowerCase().includes(q)) ||
+          (i.tags && i.tags.some(t => t.toLowerCase().includes(q))) ||
+          (i.historicalBackground && i.historicalBackground.toLowerCase().includes(q)) ||
+          (i.placeOfPurchase && i.placeOfPurchase.toLowerCase().includes(q)) ||
+          (i.storageLocation && i.storageLocation.toLowerCase().includes(q))
+        );
       }
     }
     if (f.manufacturer) items = items.filter(i => i.manufacturer === f.manufacturer);
