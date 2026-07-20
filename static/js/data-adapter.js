@@ -88,7 +88,9 @@ const DataAdapter = {
               return fn;
             }
             try {
-              const dataUrl = await invoke('read_upload_file', { filename: fn });
+              // Strip /uploads/ prefix if present — database stores full paths
+              const cleanFn = fn.replace(/^\/uploads\//, '');
+              const dataUrl = await invoke('read_upload_file', { filename: cleanFn });
               return dataUrl;
             } catch (e) {
               console.warn('Failed to load image:', fn, e);
