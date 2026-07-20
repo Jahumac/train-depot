@@ -90,6 +90,7 @@ const DataAdapter = {
       'GET /api/settings': 'get_settings',
       'PUT /api/settings': 'update_settings',
       'GET /api/categories': 'get_categories',
+      'GET /api/items/': 'get_item',
       'GET /api/items': 'get_items',
       'POST /api/items': 'create_item',
       'PUT /api/items/': 'update_item',
