@@ -1510,6 +1510,19 @@ body.drawer-open { overflow: hidden; }
   color: var(--color-text);
 }
 
+[data-theme="dark"] select,
+[data-theme="dark"] input,
+[data-theme="dark"] .sort-select {
+  background: var(--color-bg-card);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] select:focus,
+[data-theme="dark"] input:focus {
+  border-color: var(--color-primary-light);
+}
+
 .form-error {
   color: var(--color-danger);
   font-size: 0.8rem;
