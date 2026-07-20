@@ -88,8 +88,10 @@ const DataAdapter = {
               return fn;
             }
             try {
-              return await invoke('read_upload_file', { filename: fn });
-            } catch {
+              const dataUrl = await invoke('read_upload_file', { filename: fn });
+              return dataUrl;
+            } catch (e) {
+              console.warn('Failed to load image:', fn, e);
               return fn; // fallback to filename if read fails
             }
           }));
@@ -97,7 +99,7 @@ const DataAdapter = {
         }
       }
     } catch (e) {
-      // If anything fails, leave images as-is
+      console.warn('Image resolution failed:', e);
     }
     return items;
   },
