@@ -251,7 +251,7 @@ Object.assign(app, {
     const file = event.target.files[0];
     if (!file) return;
 
-    // In Tauri mode, read file in JS and pass binary through IPC
+    // In Tauri mode, use file.path from HTML input (Tauri v2 exposes real path)
     if (window.__TAURI_INTERNALS__) {
       const ok = await this.showConfirmModal({
         title: 'Restore full backup?',
@@ -263,10 +263,17 @@ Object.assign(app, {
       if (!ok) { event.target.value = ''; return; }
       this.toast('Restoring data \u2014 this may take a moment\u2026');
       try {
-        const buf = await file.arrayBuffer();
-        // Pass Uint8Array directly — Tauri v2 IPC handles binary natively
-        const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup_from_bytes', { data: new Uint8Array(buf) });
-        this.toast('All aboard \u2014 restored with ' + result + ' photo' + (result === '1' ? '' : 's') + '!');
+        // Tauri v2 exposes the real filesystem path on file.path from HTML input
+        const filePath = file.path;
+        if (!filePath) {
+          // Fallback: try reading as bytes (smaller files)
+          const buf = await file.arrayBuffer();
+          const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup_from_bytes', { data: new Uint8Array(buf) });
+          this.toast('All aboard \u2014 restored with ' + result + ' photo' + (result === '1' ? '' : 's') + '!');
+        } else {
+          const result = await window.__TAURI_INTERNALS__.invoke('import_zip_backup', { zipPath: filePath });
+          this.toast('All aboard \u2014 restored with ' + result + ' photo' + (result === '1' ? '' : 's') + '!');
+        }
         await this.loadCategories();
         await this.loadAllItems();
         await this.loadStats();
