@@ -65,7 +65,8 @@ const DataAdapter = {
         return this._resolveImageUrls(result);
       }
       if (result && result.images) {
-        return this._resolveImageUrls([result])[0];
+        const resolved = await this._resolveImageUrls([result]);
+        return resolved[0];
       }
       return result;
     } catch (e) {
