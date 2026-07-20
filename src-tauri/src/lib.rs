@@ -228,23 +228,6 @@ fn delete_temp_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn pick_and_restore_backup(state: State<AppState>, app_handle: tauri::AppHandle) -> Result<String, String> {
-    let file = app_handle.dialog()
-        .file()
-        .add_filter("Backup", &["zip", "json"])
-        .blocking_pick_file();
-    
-    match file {
-        Some(path) => {
-            let path_str = path.to_string();
-            let bytes = std::fs::read(&path_str).map_err(|e| format!("Cannot read file: {}", e))?;
-            state.db.lock().map_err(|e| e.to_string())?.import_from_zip(&bytes)
-        }
-        None => Err("No file selected".to_string())
-    }
-}
-
-#[tauri::command]
 fn import_zip_backup_from_bytes(state: State<AppState>, data: Vec<u8>) -> Result<String, String> {
     state.db.lock().map_err(|e| e.to_string())?.import_from_zip(&data)
 }
@@ -353,7 +336,6 @@ pub fn run() {
             health_check,
             get_upload_dir,
             read_upload_file,
-            pick_and_restore_backup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
