@@ -279,25 +279,24 @@ Object.assign(app, {
         }
         if (eocd < 0) throw new Error('Invalid ZIP file');
         
-        const cdOffset = new DataView(buf.buffer, eocd + 16, 4).getUint32(0, true);
-        const cdSize = new DataView(buf.buffer, eocd + 12, 4).getUint32(0, true);
-        const numEntries = new DataView(buf.buffer, eocd + 10, 2).getUint16(0, true);
+        const dv = new DataView(buf);
+        const cdOffset = dv.getUint32(eocd + 16, true);
+        const numEntries = dv.getUint16(eocd + 10, true);
         
         let pos = cdOffset;
         for (let i = 0; i < numEntries; i++) {
-          if (new DataView(buf.buffer, pos, 4).getUint32(0, true) !== 0x02014b50) break;
-          const compMethod = new DataView(buf.buffer, pos + 10, 2).getUint16(0, true);
-          const compSize = new DataView(buf.buffer, pos + 20, 4).getUint32(0, true);
-          const uncompSize = new DataView(buf.buffer, pos + 24, 4).getUint32(0, true);
-          const nameLen = new DataView(buf.buffer, pos + 28, 2).getUint16(0, true);
-          const extraLen = new DataView(buf.buffer, pos + 30, 2).getUint16(0, true);
-          const commentLen = new DataView(buf.buffer, pos + 32, 2).getUint16(0, true);
-          const localHeaderOffset = new DataView(buf.buffer, pos + 42, 4).getUint32(0, true);
+          if (dv.getUint32(pos, true) !== 0x02014b50) break;
+          const compMethod = dv.getUint16(pos + 10, true);
+          const compSize = dv.getUint32(pos + 20, true);
+          const nameLen = dv.getUint16(pos + 28, true);
+          const extraLen = dv.getUint16(pos + 30, true);
+          const commentLen = dv.getUint16(pos + 32, true);
+          const localHeaderOffset = dv.getUint32(pos + 42, true);
           const name = new TextDecoder().decode(bytes.slice(pos + 46, pos + 46 + nameLen));
           
           // Get data offset from local file header
-          const localNameLen = new DataView(buf.buffer, localHeaderOffset + 26, 2).getUint16(0, true);
-          const localExtraLen = new DataView(buf.buffer, localHeaderOffset + 28, 2).getUint16(0, true);
+          const localNameLen = dv.getUint16(localHeaderOffset + 26, true);
+          const localExtraLen = dv.getUint16(localHeaderOffset + 28, true);
           const dataOffset = localHeaderOffset + 30 + localNameLen + localExtraLen;
           const compressedData = bytes.slice(dataOffset, dataOffset + compSize);
           
@@ -305,12 +304,11 @@ Object.assign(app, {
             if (compMethod === 0) {
               dataJson = new TextDecoder().decode(compressedData);
             } else if (compMethod === 8) {
-              // DEFLATE
+              // DEFLATE — use native browser DecompressionStream
               const ds = new DecompressionStream('deflate-raw');
-              const blob = new Blob([compressedData]);
-              const decompressed = await blob.stream().pipeThrough(ds).getReader().read();
-              const fullDecompressed = await new Response(new Blob([decompressed.value])).text();
-              dataJson = fullDecompressed;
+              const stream = new Blob([compressedData]).stream().pipeThrough(ds);
+              const decompressed = await new Response(stream).text();
+              dataJson = decompressed;
             }
           } else if (name.startsWith('uploads/') && !name.endsWith('/')) {
             const filename = name.replace('uploads/', '');
@@ -319,9 +317,9 @@ Object.assign(app, {
               photoData = compressedData;
             } else if (compMethod === 8) {
               const ds = new DecompressionStream('deflate-raw');
-              const blob = new Blob([compressedData]);
-              const decompressed = await blob.stream().pipeThrough(ds).getReader().read();
-              photoData = decompressed.value;
+              const stream = new Blob([compressedData]).stream().pipeThrough(ds);
+              const decompressed = await new Response(stream).arrayBuffer();
+              photoData = new Uint8Array(decompressed);
             }
             if (photoData) {
               photoEntries.push({ filename, data: photoData });
