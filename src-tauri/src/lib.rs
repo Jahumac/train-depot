@@ -230,19 +230,22 @@ fn delete_temp_file(path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn pick_and_restore_backup(state: State<AppState>, app_handle: tauri::AppHandle) -> Result<String, String> {
-    let file = app_handle.dialog()
+    use tauri_plugin_dialog::DialogExt;
+    // Non-blocking dialog with channel — command thread waits, main thread doesn't
+    let (tx, rx) = std::sync::mpsc::channel();
+    app_handle.dialog()
         .file()
         .add_filter("Backup", &["zip", "json"])
-        .blocking_pick_file();
+        .pick_file(move |file_path| {
+            let _ = tx.send(file_path);
+        });
     
-    match file {
-        Some(path) => {
-            let path_str = path.to_string();
-            let bytes = std::fs::read(&path_str).map_err(|e| format!("Cannot read file: {}", e))?;
-            state.db.lock().map_err(|e| e.to_string())?.import_from_zip(&bytes)
-        }
-        None => Err("No file selected".to_string())
-    }
+    let file_path = rx.recv().unwrap_or(None)
+        .ok_or("No file selected".to_string())?;
+    
+    let path_str = file_path.to_string();
+    let bytes = std::fs::read(&path_str).map_err(|e| format!("Cannot read file: {}", e))?;
+    state.db.lock().map_err(|e| e.to_string())?.import_from_zip(&bytes)
 }
 
 #[tauri::command]
