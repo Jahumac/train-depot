@@ -515,8 +515,9 @@ const app = {
 
   initTheme() {
     const saved = localStorage.getItem('trainCatalogTheme');
-    if (saved === 'dark') {
+    if (saved === 'dark' || saved === null) {
       document.documentElement.setAttribute('data-theme', 'dark');
+      if (saved === null) localStorage.setItem('trainCatalogTheme', 'dark');
     }
     this.updateThemeIcon();
   },
