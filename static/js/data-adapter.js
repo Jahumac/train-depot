@@ -12,7 +12,6 @@
 
 const DataAdapter = {
   mode: 'api', // 'api' | 'tauri' | 'capacitor'
-  _imageCache: new Map(), // cache resolved data URLs
 
   // Set the mode at startup
   init(mode) {
@@ -80,40 +79,28 @@ const DataAdapter = {
     const invoke = window.__TAURI_INTERNALS__?.invoke
                 || window.__TAURI__?.core?.invoke;
     if (!invoke) return items;
-    let firstError = null;
-    try {
-      for (const item of items) {
+    // Load images in batches of 10 to keep UI responsive
+    const batchSize = 10;
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (item) => {
         if (item.images && item.images.length > 0) {
           const resolved = await Promise.all(item.images.map(async (fn) => {
             if (fn.startsWith('http://') || fn.startsWith('https://') || fn.startsWith('data:')) {
               return fn;
             }
-            // Check cache first
-            if (this._imageCache.has(fn)) {
-              return this._imageCache.get(fn);
-            }
             try {
               const cleanFn = fn.replace(/^\/uploads\//, '');
-              const dataUrl = await invoke('read_upload_file', { filename: cleanFn });
-              this._imageCache.set(fn, dataUrl);
-              return dataUrl;
+              return await invoke('read_upload_file', { filename: cleanFn });
             } catch (e) {
-              if (!firstError) firstError = { fn, cleanFn: fn.replace(/^\/uploads\//, ''), msg: e.message || String(e) };
               return fn;
             }
           }));
           item.images = resolved;
         }
-      }
-    } catch (e) {
-      console.warn('Image resolution failed:', e);
-    }
-    if (firstError) {
-      const errMsg = 'Image error: ' + firstError.msg + ' (fn=' + firstError.fn + ')';
-      console.warn(errMsg);
-      if (window.app && window.app.toast) {
-        window.app.toast(errMsg, 'error');
-      }
+      }));
+      // Yield to UI thread between batches
+      await new Promise(r => setTimeout(r, 0));
     }
     return items;
   },
