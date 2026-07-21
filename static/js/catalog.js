@@ -277,7 +277,7 @@ Object.assign(app, {
       : '';
     const isLastViewed = this.lastViewedItemId === item.id;
     return `
-      <div class="item-card${isLastViewed ? ' item-card--last-viewed' : ''}" onclick="app.showDetail('${item.id}')">
+      <div class="item-card${isLastViewed ? ' item-card--last-viewed' : ''}" data-item-id="${item.id}" onclick="app.showDetail('${item.id}')">
         <div class="item-card-image">
           ${img}
           ${subcatName ? `<span class="item-card-badge">${this.esc(subcatName)}</span>` : ''}

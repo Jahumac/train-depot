@@ -79,8 +79,28 @@ const DataAdapter = {
     const invoke = window.__TAURI_INTERNALS__?.invoke
                 || window.__TAURI__?.core?.invoke;
     if (!invoke) return items;
-    // Don't block rendering — just return items as-is.
-    // Images are loaded lazily by the frontend via read_upload_file.
+    // Return items immediately with filenames, fire off background loads
+    const pending = [];
+    for (const item of items) {
+      if (item.images && item.images.length > 0) {
+        const fn = item.images[0];
+        if (fn.startsWith('http://') || fn.startsWith('https://') || fn.startsWith('data:')) continue;
+        const cleanFn = fn.replace(/^\/uploads\//, '');
+        pending.push({ id: item.id, cleanFn });
+      }
+    }
+    // Load images in background and update DOM when ready
+    if (pending.length > 0) {
+      setTimeout(async () => {
+        for (const p of pending) {
+          try {
+            const dataUrl = await invoke('read_upload_file', { filename: p.cleanFn });
+            const img = document.querySelector(`[data-item-id="${p.id}"] img.lazy-tauri-image`);
+            if (img) img.src = dataUrl;
+          } catch {}
+        }
+      }, 100);
+    }
     return items;
   },
 
@@ -181,47 +201,6 @@ const DataAdapter = {
 (function detectMode() {
   if (window.__TAURI_INTERNALS__ || window.__TAURI__) {
     DataAdapter.init('tauri');
-    // Set up lazy image loading for Tauri mode
-    if (window.__TAURI_INTERNALS__?.invoke) {
-      const invoke = window.__TAURI_INTERNALS__.invoke;
-      const observer = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const img = entry.target;
-            const src = img.getAttribute('data-tauri-src');
-            if (src && !img.src) {
-              const cleanFn = src.replace(/^\/uploads\//, '');
-              invoke('read_upload_file', { filename: cleanFn }).then(dataUrl => {
-                img.src = dataUrl;
-              }).catch(() => {});
-            }
-            observer.unobserve(img);
-          }
-        }
-      }, { rootMargin: '200px' });
-      // Observe images when DOM is ready
-      function observeLazyImages() {
-        document.querySelectorAll('img.lazy-tauri-image:not([data-observed])').forEach(img => {
-          img.setAttribute('data-observed', '1');
-          observer.observe(img);
-        });
-      }
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', observeLazyImages);
-      } else {
-        observeLazyImages();
-      }
-      // Also observe when catalog re-renders
-      const origRender = window.app?.renderCatalog;
-      if (origRender) {
-        const wrapped = function() {
-          const html = origRender.call(this);
-          setTimeout(observeLazyImages, 50);
-          return html;
-        };
-        window.app.renderCatalog = wrapped;
-      }
-    }
   } else if (window.__CAPACITOR__) {
     DataAdapter.init('capacitor');
   } else {
