@@ -76,25 +76,7 @@ const DataAdapter = {
 
   // Resolve image filenames to local file URLs in Tauri mode
   async _resolveImageUrls(items) {
-    const invoke = window.__TAURI_INTERNALS__?.invoke
-                || window.__TAURI__?.core?.invoke;
-    if (!invoke) return items;
-    // Get the upload directory once, then construct file:// URLs
-    let uploadDir = '';
-    try {
-      uploadDir = await invoke('get_upload_dir');
-    } catch {}
-    if (!uploadDir) return items;
-    
-    for (const item of items) {
-      if (item.images && item.images.length > 0) {
-        const fn = item.images[0];
-        if (fn.startsWith('http://') || fn.startsWith('https://') || fn.startsWith('data:')) continue;
-        const cleanFn = fn.replace(/^\/uploads\//, '');
-        // Use file:// URL — browser loads directly from disk, no IPC
-        item.images[0] = 'file://' + uploadDir + '/' + cleanFn;
-      }
-    }
+    // Return items as-is. Images are loaded by a separate background loader.
     return items;
   },
 

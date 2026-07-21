@@ -573,6 +573,30 @@ const app = {
     this.renderStats();
   },
 
+  // In Tauri mode, load catalog images in the background after rendering
+  loadCatalogImages() {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (!invoke) return;
+    const imgs = document.querySelectorAll('.item-card-image img[data-tauri-src]');
+    let idx = 0;
+    function loadNext() {
+      if (idx >= imgs.length) return;
+      const batch = [];
+      for (let i = 0; i < 5 && idx < imgs.length; i++, idx++) {
+        const img = imgs[idx];
+        const src = img.getAttribute('data-tauri-src');
+        if (src) {
+          const cleanFn = src.replace(/^\/uploads\//, '');
+          batch.push(invoke('read_upload_file', { filename: cleanFn }).then(dataUrl => {
+            img.src = dataUrl;
+          }).catch(() => {}));
+        }
+      }
+      Promise.all(batch).then(() => setTimeout(loadNext, 0));
+    }
+    setTimeout(loadNext, 100);
+  },
+
   // ==================== Navigation ====================
 
   setNav(active) {
@@ -666,6 +690,11 @@ const app = {
     document.body.classList.remove('drawer-open');
     const sidebarDrawerBackdrop = document.getElementById('sidebarDrawerBackdrop');
     if (sidebarDrawerBackdrop) sidebarDrawerBackdrop.classList.remove('open');
+
+    // In Tauri mode, load images in the background after rendering
+    if (window.__TAURI_INTERNALS__) {
+      this.loadCatalogImages();
+    }
 
     // Restore scroll position if returning from a detail view
     if (this.catalogScrollY != null) {
