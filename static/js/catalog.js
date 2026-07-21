@@ -260,7 +260,7 @@ Object.assign(app, {
       } else {
         const fp = item.imageFocalPoints && item.imageFocalPoints[imgUrl];
         const posStyle = fp ? ` style="object-position:${fp.x}% ${fp.y}%"` : '';
-        img = `<img src="${imgUrl}" alt="${this.esc(item.name)}" loading="lazy"${posStyle}>`;
+        img = `<img src="" data-tauri-src="${this.esc(cleanFn)}" alt="${this.esc(item.name)}" loading="lazy" class="lazy-tauri-image"${posStyle}>`;
       }
     } else {
       img = `<div class="item-card-placeholder">${this.categorySilhouette(item.categoryId)}</div>`;

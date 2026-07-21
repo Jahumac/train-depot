@@ -79,29 +79,8 @@ const DataAdapter = {
     const invoke = window.__TAURI_INTERNALS__?.invoke
                 || window.__TAURI__?.core?.invoke;
     if (!invoke) return items;
-    // Load images in batches of 10 to keep UI responsive
-    const batchSize = 10;
-    for (let i = 0; i < items.length; i += batchSize) {
-      const batch = items.slice(i, i + batchSize);
-      await Promise.all(batch.map(async (item) => {
-        if (item.images && item.images.length > 0) {
-          const resolved = await Promise.all(item.images.map(async (fn) => {
-            if (fn.startsWith('http://') || fn.startsWith('https://') || fn.startsWith('data:')) {
-              return fn;
-            }
-            try {
-              const cleanFn = fn.replace(/^\/uploads\//, '');
-              return await invoke('read_upload_file', { filename: cleanFn });
-            } catch (e) {
-              return fn;
-            }
-          }));
-          item.images = resolved;
-        }
-      }));
-      // Yield to UI thread between batches
-      await new Promise(r => setTimeout(r, 0));
-    }
+    // Don't block rendering — just return items as-is.
+    // Images are loaded lazily by the frontend via read_upload_file.
     return items;
   },
 
@@ -202,6 +181,35 @@ const DataAdapter = {
 (function detectMode() {
   if (window.__TAURI_INTERNALS__ || window.__TAURI__) {
     DataAdapter.init('tauri');
+    // Set up lazy image loading for Tauri mode
+    if (window.__TAURI_INTERNALS__?.invoke) {
+      const invoke = window.__TAURI_INTERNALS__.invoke;
+      const observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const img = entry.target;
+            const src = img.getAttribute('data-tauri-src');
+            if (src && !img.src) {
+              const cleanFn = src.replace(/^\/uploads\//, '');
+              invoke('read_upload_file', { filename: cleanFn }).then(dataUrl => {
+                img.src = dataUrl;
+              }).catch(() => {
+                img.src = ''; // keep placeholder
+              });
+            }
+            observer.unobserve(img);
+          }
+        }
+      }, { rootMargin: '200px' });
+      // Observe new lazy images as they're added to the DOM
+      const mo = new MutationObserver(() => {
+        document.querySelectorAll('img.lazy-tauri-image:not([data-observed])').forEach(img => {
+          img.setAttribute('data-observed', '1');
+          observer.observe(img);
+        });
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
   } else if (window.__CAPACITOR__) {
     DataAdapter.init('capacitor');
   } else {
