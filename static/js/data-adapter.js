@@ -103,7 +103,12 @@ const DataAdapter = {
       console.warn('Image resolution failed:', e);
     }
     if (firstError) {
-      console.warn('First image error:', JSON.stringify(firstError));
+      const errMsg = 'Image error: ' + firstError.msg + ' (fn=' + firstError.fn + ')';
+      console.warn(errMsg);
+      // Show as toast if app has toast method
+      if (window.app && window.app.toast) {
+        window.app.toast(errMsg, 'error');
+      }
     }
     return items;
   },
