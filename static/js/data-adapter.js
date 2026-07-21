@@ -79,22 +79,21 @@ const DataAdapter = {
     const invoke = window.__TAURI_INTERNALS__?.invoke
                 || window.__TAURI__?.core?.invoke;
     if (!invoke) return items;
+    let firstError = null;
     try {
       for (const item of items) {
         if (item.images && item.images.length > 0) {
-          // Load each image via read_upload_file command
           const resolved = await Promise.all(item.images.map(async (fn) => {
             if (fn.startsWith('http://') || fn.startsWith('https://') || fn.startsWith('data:')) {
               return fn;
             }
             try {
-              // Strip /uploads/ prefix if present — database stores full paths
               const cleanFn = fn.replace(/^\/uploads\//, '');
               const dataUrl = await invoke('read_upload_file', { filename: cleanFn });
               return dataUrl;
             } catch (e) {
-              console.warn('Failed to load image:', fn, e);
-              return fn; // fallback to filename if read fails
+              if (!firstError) firstError = { fn, cleanFn: fn.replace(/^\/uploads\//, ''), msg: e.message || String(e) };
+              return fn;
             }
           }));
           item.images = resolved;
@@ -102,6 +101,9 @@ const DataAdapter = {
       }
     } catch (e) {
       console.warn('Image resolution failed:', e);
+    }
+    if (firstError) {
+      console.warn('First image error:', JSON.stringify(firstError));
     }
     return items;
   },
