@@ -12,6 +12,7 @@
 
 const DataAdapter = {
   mode: 'api', // 'api' | 'tauri' | 'capacitor'
+  _imageCache: new Map(), // cache resolved data URLs
 
   // Set the mode at startup
   init(mode) {
@@ -87,9 +88,14 @@ const DataAdapter = {
             if (fn.startsWith('http://') || fn.startsWith('https://') || fn.startsWith('data:')) {
               return fn;
             }
+            // Check cache first
+            if (this._imageCache.has(fn)) {
+              return this._imageCache.get(fn);
+            }
             try {
               const cleanFn = fn.replace(/^\/uploads\//, '');
               const dataUrl = await invoke('read_upload_file', { filename: cleanFn });
+              this._imageCache.set(fn, dataUrl);
               return dataUrl;
             } catch (e) {
               if (!firstError) firstError = { fn, cleanFn: fn.replace(/^\/uploads\//, ''), msg: e.message || String(e) };
@@ -105,7 +111,6 @@ const DataAdapter = {
     if (firstError) {
       const errMsg = 'Image error: ' + firstError.msg + ' (fn=' + firstError.fn + ')';
       console.warn(errMsg);
-      // Show as toast if app has toast method
       if (window.app && window.app.toast) {
         window.app.toast(errMsg, 'error');
       }
