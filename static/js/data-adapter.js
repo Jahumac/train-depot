@@ -193,22 +193,34 @@ const DataAdapter = {
               const cleanFn = src.replace(/^\/uploads\//, '');
               invoke('read_upload_file', { filename: cleanFn }).then(dataUrl => {
                 img.src = dataUrl;
-              }).catch(() => {
-                img.src = ''; // keep placeholder
-              });
+              }).catch(() => {});
             }
             observer.unobserve(img);
           }
         }
       }, { rootMargin: '200px' });
-      // Observe new lazy images as they're added to the DOM
-      const mo = new MutationObserver(() => {
+      // Observe images when DOM is ready
+      function observeLazyImages() {
         document.querySelectorAll('img.lazy-tauri-image:not([data-observed])').forEach(img => {
           img.setAttribute('data-observed', '1');
           observer.observe(img);
         });
-      });
-      mo.observe(document.body, { childList: true, subtree: true });
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', observeLazyImages);
+      } else {
+        observeLazyImages();
+      }
+      // Also observe when catalog re-renders
+      const origRender = window.app?.renderCatalog;
+      if (origRender) {
+        const wrapped = function() {
+          const html = origRender.call(this);
+          setTimeout(observeLazyImages, 50);
+          return html;
+        };
+        window.app.renderCatalog = wrapped;
+      }
     }
   } else if (window.__CAPACITOR__) {
     DataAdapter.init('capacitor');
