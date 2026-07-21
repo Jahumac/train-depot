@@ -79,27 +79,21 @@ const DataAdapter = {
     const invoke = window.__TAURI_INTERNALS__?.invoke
                 || window.__TAURI__?.core?.invoke;
     if (!invoke) return items;
-    // Return items immediately with filenames, fire off background loads
-    const pending = [];
+    // Get the upload directory once, then construct file:// URLs
+    let uploadDir = '';
+    try {
+      uploadDir = await invoke('get_upload_dir');
+    } catch {}
+    if (!uploadDir) return items;
+    
     for (const item of items) {
       if (item.images && item.images.length > 0) {
         const fn = item.images[0];
         if (fn.startsWith('http://') || fn.startsWith('https://') || fn.startsWith('data:')) continue;
         const cleanFn = fn.replace(/^\/uploads\//, '');
-        pending.push({ id: item.id, cleanFn });
+        // Use file:// URL — browser loads directly from disk, no IPC
+        item.images[0] = 'file://' + uploadDir + '/' + cleanFn;
       }
-    }
-    // Load images in background and update DOM when ready
-    if (pending.length > 0) {
-      setTimeout(async () => {
-        for (const p of pending) {
-          try {
-            const dataUrl = await invoke('read_upload_file', { filename: p.cleanFn });
-            const img = document.querySelector(`[data-item-id="${p.id}"] img.lazy-tauri-image`);
-            if (img) img.src = dataUrl;
-          } catch {}
-        }
-      }, 100);
     }
     return items;
   },
